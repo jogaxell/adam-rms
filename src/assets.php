@@ -19,6 +19,8 @@ $SEARCH = [
     "PROJECT_REFERER" => $_GET['project_referer'] ?: false,
     "PAGE" =>  $_GET['page'] ? intval($_GET['page']) : 1,
     "PAGE_LIMIT" => $_GET['resultsperpage'] ? intval($_GET['resultsperpage']) : 20,
+    "SIMPLE" => (isset($_GET['simple']) and $_GET['simple'] == '1'),
+    "SIMPLE_KEYWORD" => isset($_GET['simple_keyword']) ? trim((string)$_GET['simple_keyword']) : '',
     "SETTINGS" => [
         "SHOWLINKED" => ($_GET['showlinked'] == 1 ? true : false),
         "SHOWARCHIVED" => ($_GET['showarchived'] == 1 ? true : false),
@@ -112,7 +114,38 @@ if (count($sortArray) == 2) {
 $DBLIB->orderBy("assetTypes.assetTypes_name", "ASC"); // Last item in the sort each time
 
 //Keywords
-if (count($SEARCH['TERMS']['KEYWORDS']) > 0) {
+if ($SEARCH['SIMPLE']) {
+    // Broad AssetType keyword match: name, description, manufacturer, category name,
+    // category-group name, and physical-asset tag. Each whitespace-separated term must
+    // match somewhere.
+    if ($SEARCH['SIMPLE_KEYWORD'] !== '') {
+        $terms = array_values(array_filter(preg_split('/\s+/', $SEARCH['SIMPLE_KEYWORD'])));
+        if (count($terms) > 0) {
+            $instanceIdInt = intval($SEARCH['INSTANCE_ID']);
+            $andClauses = [];
+            $allValues = [];
+            foreach ($terms as $term) {
+                $like = '%' . $term . '%';
+                $andClauses[] = "(
+                    assetTypes.assetTypes_name LIKE ?
+                    OR assetTypes.assetTypes_description LIKE ?
+                    OR manufacturers.manufacturers_name LIKE ?
+                    OR assetCategories.assetCategories_name LIKE ?
+                    OR assetCategoriesGroups.assetCategoriesGroups_name LIKE ?
+                    OR EXISTS (
+                        SELECT 1 FROM assets a2
+                        WHERE a2.assetTypes_id = assetTypes.assetTypes_id
+                          AND a2.instances_id = ?
+                          AND a2.assets_deleted = 0
+                          AND a2.assets_tag LIKE ?
+                    )
+                )";
+                array_push($allValues, $like, $like, $like, $like, $like, $instanceIdInt, $like);
+            }
+            $DBLIB->where('(' . implode(' AND ', $andClauses) . ')', $allValues);
+        }
+    }
+} elseif (count($SEARCH['TERMS']['KEYWORDS']) > 0) {
     $thisWhere = false;
     $thisValues = [];
     foreach ($SEARCH['TERMS']['KEYWORDS'] as $word) {
@@ -288,4 +321,21 @@ if (count($SEARCH['TERMS']['CATEGORY']) > 0) {
 
 $RETURN['SEARCH'] = $SEARCH;
 $PAGEDATA['searchResults'] = $RETURN;
+
+// TEMP DIAGNOSTIC (remove after Issue 2 is nailed): whenever a Group filter is set,
+// log the request state, the resolved SEARCH.TERMS.GROUPS, the final generated main
+// query with values substituted, and the trace tail. Read via `docker logs <container>`.
+if (!empty($SEARCH['TERMS']['GROUPS'])) {
+    error_log("[assets.php group-filter-debug] " . json_encode([
+        'GET' => $_GET,
+        'INSTANCE_ID' => $SEARCH['INSTANCE_ID'],
+        'SIMPLE' => $SEARCH['SIMPLE'],
+        'TERMS_GROUPS' => $SEARCH['TERMS']['GROUPS'],
+        'RESULT_COUNT' => count($RETURN['ASSETS']),
+        'PAGINATION_COUNT' => $RETURN['PAGINATION']['COUNT'],
+        'LAST_QUERY' => $DBLIB->getLastQuery(),
+        'TRACE_TAIL' => array_map(function ($t) { return $t[0] ?? null; }, array_slice($DBLIB->trace, -6)),
+    ]));
+}
+
 echo $TWIG->render('assets.twig', $PAGEDATA);
