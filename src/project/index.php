@@ -117,6 +117,13 @@ foreach ($PAGEDATA['FINANCIALS']['assetsAssignedSUB'] as $instance) { //Go throu
     }
 }
 
+// Locations for Location Dispatch modal "Other Location" dropdown
+$DBLIB->where("instances_id", $AUTH->data['instance']['instances_id']);
+$DBLIB->where("locations_deleted", 0);
+$DBLIB->where("locations_archived", 0);
+$DBLIB->orderBy("locations_name", "ASC");
+$PAGEDATA['locationDispatchLocations'] = $DBLIB->get("locations", null, ["locations_id", "locations_name"]);
+
 //Edit Options - Project Statuses list
 if ($AUTH->instancePermissionCheck("PROJECTS:EDIT:STATUS")) {
     $DBLIB->where("instances_id", $AUTH->data['instance']['instances_id']);

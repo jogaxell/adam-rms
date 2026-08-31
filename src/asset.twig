@@ -490,7 +490,7 @@
                                             <br/><small>{{ scan.assetsBarcodesScans_validation }}</small>
                                         </td>
                                         <td>
-                                            {% if scan.assetsBarcodesScans_barcodeWasScanned == "1" %}Barcode scanned{% else %}Location set manually{% endif %}
+                                            {% if scan.assetsBarcodesScans_barcodeWasScanned == "1" %}Barcode scanned{% elseif scan.assetsBarcodesScans_barcodeWasScanned == "2" %}Location Dispatch{% else %}Location set manually{% endif %}
                                         </td>
                                         <td>
                                             <a href="{{ CONFIG.ROOTURL }}/user.php?id={{ scan.users_userid }}">{{ scan.users_name1 ~ " " ~ scan.users_name2 }}</a>
