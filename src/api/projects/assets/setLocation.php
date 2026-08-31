@@ -21,23 +21,26 @@ if ($strategy === 'other' && (!isset($_POST['locations_id']) || !is_numeric($_PO
 
 $projectsId = (int)$_POST['projects_id'];
 
+// Fetch project name for scan validation label (and venue for 'project' strategy)
+$DBLIB->where("projects_id", $projectsId);
+$DBLIB->where("instances_id", $AUTH->data['instance']['instances_id']);
+$DBLIB->where("projects_deleted", 0);
+$project = $DBLIB->getone("projects", ["projects_name", "locations_id"]);
+if (!$project) finish(false, ["code" => "NOTFOUND", "message" => "Project not found"]);
+$scanValidation = "Dispatched from Project " . $project['projects_name'];
+
 // Resolve project venue if needed
 $projectLocationId = null;
 if ($strategy === 'project') {
-    $DBLIB->where("projects_id", $projectsId);
-    $DBLIB->where("instances_id", $AUTH->data['instance']['instances_id']);
-    $DBLIB->where("projects_deleted", 0);
-    $project = $DBLIB->getone("projects", ["locations_id"]);
-    if (!$project || !$project['locations_id']) {
+    if (!$project['locations_id']) {
         finish(false, ["code" => "NOVENUEASSIGNED", "message" => "This project has no venue assigned"]);
     }
     $projectLocationId = (int)$project['locations_id'];
 }
 
-// Validate 'other' location belongs to this instance
+// Validate 'other' location exists and is active (any instance — sub-instance locations are valid targets)
 if ($strategy === 'other') {
     $DBLIB->where("locations_id", (int)$_POST['locations_id']);
-    $DBLIB->where("instances_id", $AUTH->data['instance']['instances_id']);
     $DBLIB->where("locations_deleted", 0);
     $DBLIB->where("locations_archived", 0);
     $loc = $DBLIB->getone("locations", ["locations_id"]);
@@ -130,11 +133,12 @@ foreach ($_POST['assetsAssignments_id'] as $rawId) {
     }
 
     $DBLIB->insert("assetsBarcodesScans", [
-        "assetsBarcodes_id"                    => (int)$assetBarcode['assetsBarcodes_id'],
-        "users_userid"                         => $AUTH->data['users_userid'],
-        "assetsBarcodesScans_timestamp"        => date('Y-m-d H:i:s'),
-        "locationsBarcodes_id"                 => $locationBarcodeId,
+        "assetsBarcodes_id"                     => (int)$assetBarcode['assetsBarcodes_id'],
+        "users_userid"                          => $AUTH->data['users_userid'],
+        "assetsBarcodesScans_timestamp"         => date('Y-m-d H:i:s'),
+        "locationsBarcodes_id"                  => $locationBarcodeId,
         "assetsBarcodesScans_barcodeWasScanned" => 2,
+        "assetsBarcodesScans_validation"        => $scanValidation,
     ]);
 
     $succeeded[] = ["assetsAssignments_id" => $assignmentId, "assets_tag" => $assignment['assets_tag']];

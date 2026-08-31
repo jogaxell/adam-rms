@@ -220,68 +220,121 @@
                 </button>
             </div>
             <div class="modal-body">
-                <div class="form-group">
-                    <label>Filter by Status</label>
-                    <select class="form-control" id="locationDispatchStatusFilter">
-                        <option value="">All Statuses</option>
-                        {% for status in BOARDSTATUSES[USERDATA.instance.instances_id] %}
-                            <option value="{{ status.assetsAssignmentsStatus_id }}">{{ status.assetsAssignmentsStatus_name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
-                    <table class="table table-sm table-bordered mb-0">
-                        <thead class="thead-light">
-                            <tr>
-                                <th style="width: 30px;">
-                                    <input type="checkbox" id="locationDispatchSelectAll" title="Select all visible">
-                                </th>
-                                <th>Tag</th>
-                                <th>Asset</th>
-                                <th>Status</th>
-                                <th>Current Location</th>
-                                <th>Storage Location</th>
-                            </tr>
-                        </thead>
-                        <tbody id="locationDispatchAssetTableBody">
-                            {% for status in BOARDASSETS[USERDATA.instance.instances_id] %}
-                                {% for asset in status.assets %}
-                                    <tr class="location-dispatch-asset-row" data-statusid="{{ status.assetsAssignmentsStatus_id }}">
-                                        <td>
-                                            <input type="checkbox" class="location-dispatch-asset-checkbox"
-                                                data-assignment="{{ asset.assetsAssignments_id }}"
-                                                data-tag="{{ asset.assets_tag }}">
-                                        </td>
-                                        <td><a href="{{ CONFIG.ROOTURL }}/asset.php?id={{ asset.assetTypes_id }}&asset={{ asset.assets_id }}&instance={{ USERDATA.instance.instances_id }}" target="_blank">{{ asset.assets_tag }}</a></td>
-                                        <td>{{ asset.assetTypes_name }}</td>
-                                        <td>{{ status.assetsAssignmentsStatus_name }}</td>
-                                        <td>
-                                            {% if asset.latestScan %}
-                                                {% if asset.latestScan.locations_name %}
-                                                    {{ asset.latestScan.locations_name }}
-                                                {% elseif asset.latestScan.assetTypes_name %}
-                                                    Inside {{ asset.latestScan.assetTypes_name }} ({{ asset.latestScan.assets_tag }})
-                                                {% elseif asset.latestScan.assetsBarcodes_customLocation %}
-                                                    {{ asset.latestScan.assetsBarcodes_customLocation }}
-                                                {% else %}
-                                                    <em class="text-muted">Unknown</em>
-                                                {% endif %}
-                                            {% else %}
-                                                <em class="text-muted">No scan recorded</em>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if asset.storage_location and asset.storage_location[0] is defined %}
-                                                {{ asset.storage_location[0].locations_name }}
-                                            {% else %}
-                                                <em class="text-muted">None</em>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
+                <ul class="nav nav-tabs" role="tablist">
+                    {% if FINANCIALS.assetsAssigned|length > 0 %}
+                        <li class="nav-item">
+                            <a class="nav-link active location-dispatch-tab" data-toggle="pill" href="#location-dispatch-tab-thisinstance" role="tab" data-instanceid="{{ USERDATA.instance.instances_id }}">{{ USERDATA.instance.instances_name }}</a>
+                        </li>
+                    {% endif %}
+                    {% for instance in FINANCIALS.assetsAssignedSUB %}
+                        <li class="nav-item">
+                            <a class="nav-link{% if FINANCIALS.assetsAssigned|length == 0 and loop.first %} active{% endif %} location-dispatch-tab" data-toggle="pill" href="#location-dispatch-tab-{{ instance.instance.instances_id }}" role="tab" data-instanceid="{{ instance.instance.instances_id }}">{{ instance.instance.instances_name }}</a>
+                        </li>
+                    {% endfor %}
+                </ul>
+                <div class="tab-content pt-3">
+                    {% if FINANCIALS.assetsAssigned|length > 0 %}
+                    <div class="tab-pane show active" id="location-dispatch-tab-thisinstance" role="tabpanel">
+                        <div class="form-group">
+                            <label>Filter by Status</label>
+                            <select class="form-control locationDispatchStatusFilter">
+                                <option value="">All Statuses</option>
+                                {% for status in BOARDSTATUSES[USERDATA.instance.instances_id] %}
+                                    <option value="{{ status.assetsAssignmentsStatus_id }}">{{ status.assetsAssignmentsStatus_name }}</option>
                                 {% endfor %}
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                            </select>
+                        </div>
+                        <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                            <table class="table table-sm table-bordered mb-0">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th style="width: 30px;"><input type="checkbox" class="locationDispatchSelectAll" title="Select all visible"></th>
+                                        <th>Tag</th>
+                                        <th>Asset</th>
+                                        <th>Status</th>
+                                        <th>Current Location</th>
+                                        <th>Storage Location</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for status in BOARDASSETS[USERDATA.instance.instances_id] %}
+                                        {% for asset in status.assets %}
+                                            <tr class="location-dispatch-asset-row" data-statusid="{{ status.assetsAssignmentsStatus_id }}" data-instance="{{ USERDATA.instance.instances_id }}">
+                                                <td><input type="checkbox" class="location-dispatch-asset-checkbox" data-assignment="{{ asset.assetsAssignments_id }}" data-tag="{{ asset.assets_tag }}"></td>
+                                                <td><a href="{{ CONFIG.ROOTURL }}/asset.php?id={{ asset.assetTypes_id }}&asset={{ asset.assets_id }}&instance={{ USERDATA.instance.instances_id }}" target="_blank">{{ asset.assets_tag }}</a></td>
+                                                <td>{{ asset.assetTypes_name }}</td>
+                                                <td class="location-dispatch-status-cell">{{ status.assetsAssignmentsStatus_name }}</td>
+                                                <td>
+                                                    {% if asset.latestScan %}
+                                                        {% if asset.latestScan.locations_name %}{{ asset.latestScan.locations_name }}
+                                                        {% elseif asset.latestScan.assetTypes_name %}Inside {{ asset.latestScan.assetTypes_name }} ({{ asset.latestScan.assets_tag }})
+                                                        {% elseif asset.latestScan.assetsBarcodes_customLocation %}{{ asset.latestScan.assetsBarcodes_customLocation }}
+                                                        {% else %}<em class="text-muted">Unknown</em>{% endif %}
+                                                    {% else %}<em class="text-muted">No scan recorded</em>{% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if asset.storage_location and asset.storage_location[0] is defined %}{{ asset.storage_location[0].locations_name }}
+                                                    {% else %}<em class="text-muted">None</em>{% endif %}
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% for instance in FINANCIALS.assetsAssignedSUB %}
+                    <div class="tab-pane{% if FINANCIALS.assetsAssigned|length == 0 and loop.first %} show active{% endif %}" id="location-dispatch-tab-{{ instance.instance.instances_id }}" role="tabpanel">
+                        <div class="form-group">
+                            <label>Filter by Status</label>
+                            <select class="form-control locationDispatchStatusFilter">
+                                <option value="">All Statuses</option>
+                                {% for status in BOARDSTATUSES[instance.instance.instances_id] %}
+                                    <option value="{{ status.assetsAssignmentsStatus_id }}">{{ status.assetsAssignmentsStatus_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                            <table class="table table-sm table-bordered mb-0">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th style="width: 30px;"><input type="checkbox" class="locationDispatchSelectAll" title="Select all visible"></th>
+                                        <th>Tag</th>
+                                        <th>Asset</th>
+                                        <th>Status</th>
+                                        <th>Current Location</th>
+                                        <th>Storage Location</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for status in BOARDASSETS[instance.instance.instances_id] %}
+                                        {% for asset in status.assets %}
+                                            <tr class="location-dispatch-asset-row" data-statusid="{{ status.assetsAssignmentsStatus_id }}" data-instance="{{ instance.instance.instances_id }}">
+                                                <td><input type="checkbox" class="location-dispatch-asset-checkbox" data-assignment="{{ asset.assetsAssignments_id }}" data-tag="{{ asset.assets_tag }}"></td>
+                                                <td><a href="{{ CONFIG.ROOTURL }}/asset.php?id={{ asset.assetTypes_id }}&asset={{ asset.assets_id }}&instance={{ instance.instance.instances_id }}" target="_blank">{{ asset.assets_tag }}</a></td>
+                                                <td>{{ asset.assetTypes_name }}</td>
+                                                <td class="location-dispatch-status-cell">{{ status.assetsAssignmentsStatus_name }}</td>
+                                                <td>
+                                                    {% if asset.latestScan %}
+                                                        {% if asset.latestScan.locations_name %}{{ asset.latestScan.locations_name }}
+                                                        {% elseif asset.latestScan.assetTypes_name %}Inside {{ asset.latestScan.assetTypes_name }} ({{ asset.latestScan.assets_tag }})
+                                                        {% elseif asset.latestScan.assetsBarcodes_customLocation %}{{ asset.latestScan.assetsBarcodes_customLocation }}
+                                                        {% else %}<em class="text-muted">Unknown</em>{% endif %}
+                                                    {% else %}<em class="text-muted">No scan recorded</em>{% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if asset.storage_location and asset.storage_location[0] is defined %}{{ asset.storage_location[0].locations_name }}
+                                                    {% else %}<em class="text-muted">None</em>{% endif %}
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% endfor %}
                 </div>
                 <div class="mt-1 mb-3">
                     <small class="text-muted" id="locationDispatchSelectionCount">0 assets selected</small>
@@ -290,7 +343,7 @@
                 <div class="form-group">
                     <label>Target Location Strategy</label>
                     <div>
-                        <div class="form-check mb-1">
+                        <div class="form-check mb-1" id="locationStrategyProjectGroup">
                             <input class="form-check-input" type="radio" name="locationStrategy" id="locationStrategyProject" value="project"
                                 {{ project.locations_id ? '' : 'disabled' }}>
                             <label class="form-check-label" for="locationStrategyProject">
@@ -317,9 +370,6 @@
                         <div id="locationDispatchOtherLocationGroup" style="display: none;" class="ml-4">
                             <select class="form-control" id="locationDispatchOtherLocation">
                                 <option value="">Select a location…</option>
-                                {% for location in locationDispatchLocations %}
-                                    <option value="{{ location.locations_id }}">{{ location.locations_name }}</option>
-                                {% endfor %}
                             </select>
                         </div>
                     </div>
@@ -622,21 +672,24 @@
             $("#locationDispatchSelectionCount").text(count + " asset" + (count === 1 ? "" : "s") + " selected");
         }
 
-        $("#locationDispatchStatusFilter").on("change", function () {
+        // Status filter — scoped to the tab pane it lives in
+        $(document).on("change", ".locationDispatchStatusFilter", function () {
+            var tabPane = $(this).closest(".tab-pane");
             var statusId = $(this).val();
-            if (statusId === "") {
-                $(".location-dispatch-asset-row").show();
-            } else {
-                $(".location-dispatch-asset-row").hide();
-                $(".location-dispatch-asset-row[data-statusid='" + statusId + "']").show();
+            tabPane.find(".location-dispatch-asset-row").show();
+            if (statusId !== "") {
+                tabPane.find(".location-dispatch-asset-row").hide();
+                tabPane.find(".location-dispatch-asset-row[data-statusid='" + statusId + "']").show();
             }
-            $("#locationDispatchSelectAll").prop("checked", false);
+            tabPane.find(".locationDispatchSelectAll").prop("checked", false);
             locationDispatchUpdateCount();
         });
 
-        $("#locationDispatchSelectAll").on("change", function () {
+        // Select all — scoped to visible rows in the tab pane it lives in
+        $(document).on("change", ".locationDispatchSelectAll", function () {
+            var tabPane = $(this).closest(".tab-pane");
             var checked = $(this).prop("checked");
-            $(".location-dispatch-asset-row:visible .location-dispatch-asset-checkbox").prop("checked", checked);
+            tabPane.find(".location-dispatch-asset-row:visible .location-dispatch-asset-checkbox").prop("checked", checked);
             locationDispatchUpdateCount();
         });
 
@@ -648,33 +701,68 @@
             $("#locationDispatchOtherLocationGroup").toggle($(this).val() === "other");
         });
 
-        $("#locationDispatchModal").on("show.bs.modal", function () {
-            var instanceId = "{{ USERDATA.instance.instances_id }}";
-            var allStatuses = assetStatuses[instanceId] ? assetStatuses[instanceId].allData : [];
-            function getStatusName(statusId) {
-                if (Array.isArray(allStatuses)) {
-                    var s = allStatuses.find(function (s) { return s.assetsAssignmentsStatus_id == statusId; });
-                    return s ? s.assetsAssignmentsStatus_name : "";
-                }
-                for (var key in allStatuses) {
-                    if (allStatuses[key].assetsAssignmentsStatus_id == statusId) return allStatuses[key].assetsAssignmentsStatus_name;
-                }
-                return "";
+        // Locations per instance for the "Other Location" dropdown
+        var locationDispatchAllLocations = {};
+        locationDispatchAllLocations["{{ USERDATA.instance.instances_id }}"] = {{ locationDispatchLocations|json_encode|raw }};
+        {% for instance in FINANCIALS.assetsAssignedSUB %}
+        locationDispatchAllLocations["{{ instance.instance.instances_id }}"] = {{ locationDispatchSubLocations[instance.instance.instances_id]|json_encode|raw }};
+        {% endfor %}
+        var locationDispatchMainInstanceId = "{{ USERDATA.instance.instances_id }}";
+
+        function locationDispatchUpdateForInstance(instanceId) {
+            var isMainInstance = (String(instanceId) === String(locationDispatchMainInstanceId));
+            // "Project Location" only makes sense for the current instance's assets
+            $("#locationStrategyProjectGroup").toggle(isMainInstance);
+            if (!isMainInstance && $('input[name="locationStrategy"]:checked').val() === "project") {
+                $('input[name="locationStrategy"][value="storage"]').prop("checked", true);
+                $("#locationDispatchOtherLocationGroup").hide();
             }
+            // Repopulate "Other Location" dropdown with this instance's locations
+            var locations = locationDispatchAllLocations[instanceId] || [];
+            var select = $("#locationDispatchOtherLocation").empty().append('<option value="">Select a location…</option>');
+            locations.forEach(function (loc) {
+                select.append($("<option>").val(loc.locations_id).text(loc.locations_name));
+            });
+        }
+
+        // Update strategy options when the user switches tabs inside the modal
+        $("#locationDispatchModal").on("shown.bs.tab", ".location-dispatch-tab", function () {
+            locationDispatchUpdateForInstance($(this).data("instanceid"));
+        });
+
+        // Sync status labels and data-statusid from the live board DOM on open
+        $("#locationDispatchModal").on("show.bs.modal", function () {
             $(".location-dispatch-asset-row").each(function () {
                 var row = $(this);
                 var assignmentId = row.find(".location-dispatch-asset-checkbox").data("assignment");
+                var instanceId = row.data("instance");
                 var card = $(".assetDispatchAssetList-card[data-assignment='" + assignmentId + "']");
-                if (card.length) {
-                    var currentStatusId = card.closest(".assetDispatchAssetList").data("statusid");
-                    row.attr("data-statusid", currentStatusId);
-                    row.find("td").eq(3).text(getStatusName(currentStatusId));
+                if (!card.length) return;
+                var currentStatusId = card.closest(".assetDispatchAssetList").data("statusid");
+                row.attr("data-statusid", currentStatusId);
+                var allStatuses = assetStatuses[instanceId] ? assetStatuses[instanceId].allData : [];
+                var statusName = "";
+                if (Array.isArray(allStatuses)) {
+                    var s = allStatuses.find(function (s) { return s.assetsAssignmentsStatus_id == currentStatusId; });
+                    statusName = s ? s.assetsAssignmentsStatus_name : "";
+                } else {
+                    for (var key in allStatuses) {
+                        if (allStatuses[key].assetsAssignmentsStatus_id == currentStatusId) { statusName = allStatuses[key].assetsAssignmentsStatus_name; break; }
+                    }
                 }
+                row.find(".location-dispatch-status-cell").text(statusName);
             });
+            // Set strategy options for whichever tab is active when the modal opens
+            var activeTab = $("#locationDispatchModal").find(".location-dispatch-tab.active");
+            locationDispatchUpdateForInstance(activeTab.length ? activeTab.data("instanceid") : locationDispatchMainInstanceId);
         });
 
         $("#locationDispatchModal").on("hidden.bs.modal", function () {
-            $("#locationDispatchStatusFilter").val("").trigger("change");
+            $(".locationDispatchStatusFilter").each(function () {
+                $(this).val("");
+                $(this).closest(".tab-pane").find(".location-dispatch-asset-row").show();
+            });
+            $(".locationDispatchSelectAll").prop("checked", false);
             $(".location-dispatch-asset-checkbox").prop("checked", false);
             $('input[name="locationStrategy"][value="storage"]').prop("checked", true);
             $("#locationDispatchOtherLocationGroup").hide();
