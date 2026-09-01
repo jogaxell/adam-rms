@@ -10,6 +10,7 @@
 
 This is a fork of [adam-rms/adam-rms](https://github.com/adam-rms/adam-rms). Everything below is added on top of upstream:
 
+- **Login sessions that last** — sessions no longer die after 24 minutes of inactivity: the length is set server-wide in the config UI (7 days by default), the clock resets while you work, logins survive container restarts, and tying a session to one IP address is now an option you can switch off for users on mobile or dynamic connections.
 - **Instant asset search** — one keyword box searches asset name, description, tag, category, manufacturer and group as you type, with the old filter grid tucked behind a collapsible *Advanced filters* panel. Find kit in seconds instead of building a query; results, pagination and the URL update without a page reload.
 - **Asset Groups in search results** — with a project selected, matching Asset Groups appear as result cards with a preview table. Book a whole pre-defined kit set in one click, or pick single items out of it, without leaving the search.
 - **Location Dispatch** — a button on the project asset board bulk-assigns a location to selected project assets: the project's venue, each asset's own storage location, or any other location. Filterable by status, tabbed per sub-business, and skipped assets are reported back. Check a whole truckload in or out without scanning every barcode.
