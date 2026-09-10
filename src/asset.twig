@@ -490,7 +490,7 @@
                                             <br/><small>{{ scan.assetsBarcodesScans_validation }}</small>
                                         </td>
                                         <td>
-                                            {% if scan.assetsBarcodesScans_barcodeWasScanned == "1" %}Barcode scanned{% else %}Location set manually{% endif %}
+                                            {% if scan.assetsBarcodesScans_barcodeWasScanned == "1" %}Barcode scanned{% elseif scan.assetsBarcodesScans_barcodeWasScanned == "2" %}Location Dispatch{% else %}Location set manually{% endif %}
                                         </td>
                                         <td>
                                             <a href="{{ CONFIG.ROOTURL }}/user.php?id={{ scan.users_userid }}">{{ scan.users_name1 ~ " " ~ scan.users_name2 }}</a>
@@ -903,7 +903,7 @@
                                     {% for field in asset.fields %}
                                         <th>{{ field }}</th>
                                     {% endfor %}
-                                    <th>Notes</th>
+                                    <th>Storage Location</th>
                                     <th>Value</th>
                                     <th>Cost/day</th>
                                     <th>Cost/week</th>
@@ -918,7 +918,7 @@
                                         {% for field in asset.fields %}
                                             <td>{{ thisasset['asset_definableFields_' ~ loop.index] }}</td>
                                         {% endfor %}
-                                        <td>{{ thisasset['assets_notes']|nl2br }}</td>
+                                        <td>{% if thisasset.storage_location is defined and thisasset.storage_location|length > 0 %}{{ thisasset.storage_location[0].locations_name }}{% else %}-{% endif %}</td>
                                         <td>
                                             {{ (thisasset.assets_value ?: asset.assetTypes_value)|money(ASSET_INSTANCE['instances_config_currency']) }}
                                         </td>

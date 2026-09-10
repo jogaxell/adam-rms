@@ -166,15 +166,19 @@ if (count($PAGEDATA['assets']) == 1) {
         $PAGEDATA['assets'][0]['locationScans'] = $DBLIB->get("assetsBarcodesScans", 50, ["assetsBarcodesScans.*", "users.users_name1", "users.users_name2", "locations.locations_name", "locations.locations_id", "assets.assetTypes_id", "assetTypes.assetTypes_name", "assets.assets_tag"]);
     } else $PAGEDATA['assets'][0]['locationScans'] = [];
     //Asset Location
-    //Current asset location
-    $latestScan = assetLatestScan($asset['assets_id']);
+    // Prefer storage location over latest barcode scan
+    if (isset($PAGEDATA['assets'][0]['storage_location']) && isset($PAGEDATA['assets'][0]['storage_location'][0]['locations_name'])) {
+        $PAGEDATA['assets'][0]['assets_latestScanLocationName'] = $PAGEDATA['assets'][0]['storage_location'][0]['locations_name'];
+    } else {
+        $latestScan = assetLatestScan($assets[0]['assets_id']);
 
-    if (isset($latestScan['locations_id'])) {
-        $PAGEDATA['assets'][0]['assets_latestScanLocationName'] = $latestScan['locations_name'];
-    } elseif (isset($latestScan['location_assets_id'])) {
-        $PAGEDATA['assets'][0]['assets_latestScanLocationName'] = 'Inside asset ' . $latestScan['assetTypes_name'] . ' (' . $latestScan['assets_tag'] . ')';
-    } elseif (isset($latestScan['assetsBarcodes_customLocation'])) {
-        $PAGEDATA['assets'][0]['assets_latestScanLocationName'] = $latestScan['assetsBarcodes_customLocation'];
+        if (isset($latestScan['locations_id'])) {
+            $PAGEDATA['assets'][0]['assets_latestScanLocationName'] = $latestScan['locations_name'];
+        } elseif (isset($latestScan['location_assets_id'])) {
+            $PAGEDATA['assets'][0]['assets_latestScanLocationName'] = 'Inside asset ' . $latestScan['assetTypes_name'] . ' (' . $latestScan['assets_tag'] . ')';
+        } elseif (isset($latestScan['assetsBarcodes_customLocation'])) {
+            $PAGEDATA['assets'][0]['assets_latestScanLocationName'] = $latestScan['assetsBarcodes_customLocation'];
+        } else $PAGEDATA['assets'][0]['assets_latestScanLocationName'] = null;
     }
 
     //All Locations - to be used for setting an asset location manually

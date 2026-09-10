@@ -6,6 +6,17 @@
 [![GitHub stars](https://img.shields.io/github/stars/adam-rms/adam-rms)](https://github.com/adam-rms/adam-rms/stargazers)
 [![GitHub contributors](https://img.shields.io/github/contributors/adam-rms/adam-rms)](https://github.com/adam-rms/adam-rms/graphs/contributors)
 
+## Fork Improvements
+
+This is a fork of [adam-rms/adam-rms](https://github.com/adam-rms/adam-rms). Everything below is added on top of upstream:
+
+- **Login sessions that last** — sessions no longer die after 24 minutes of inactivity: the length is set server-wide in the config UI (7 days by default), the clock resets while you work, logins survive container restarts, and tying a session to one IP address is now an option you can switch off for users on mobile or dynamic connections.
+- **Instant asset search** — one keyword box searches asset name, description, tag, category, manufacturer and group as you type, and the *Advanced filters* combine with it. Find kit in seconds instead of building a query; results, pagination and the URL update without a page reload.
+- **Asset Groups in search results** — matching Asset Groups appear as result cards with a preview table (switchable with *Show asset groups*). With a project selected, book a whole pre-defined kit set in one click, or pick single items out of it, without leaving the search.
+- **Location Dispatch** — a button on the project asset board bulk-assigns a location to selected project assets: the project's venue, each asset's own storage location, or any other location. Filterable by status, tabbed per sub-business, and skipped assets are reported back. Check a whole truckload in or out without scanning every barcode.
+- **Storage Location on every asset list** — replaces the Notes column on asset, project-asset and search-result tables, and is preferred over the last scan on the asset page. See where an item lives without opening it.
+- **Dispatch scans labelled in history** — a location set by Location Dispatch is noted as *Dispatched from Project …* in the asset's scan log, so the audit trail shows where each location came from.
+
 AdamRMS is a free, open source advanced Rental Management System for Theatre, AV & Broadcast. It helps rental businesses track assets, manage projects, handle client relationships, and streamline billing — all from a single web-based platform.
 
 It is available as a [hosted solution](https://dash.adam-rms.com) or can be [self-hosted](https://adam-rms.com/self-hosting) using a pre-built Docker container.

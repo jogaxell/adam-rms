@@ -24,3 +24,6 @@ node_modules/
 /website/.cache-loader
 /website/api-docs
 npm-debug.log*
+
+# Local Docker Compose overrides
+docker-compose.yml

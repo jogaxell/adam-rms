@@ -234,7 +234,7 @@
                                                                     <tr>
                                                                         <th>ID</th>
                                                                         <th>Asset Type</th>
-                                                                        <th>Notes</th>
+                                                                        <th>Storage Location</th>
                                                                         <th>Cost/day</th>
                                                                         <th>Cost/week</th>
                                                                         <th style="width:1%"><i class="fas fa-flag"></i></th>
@@ -253,7 +253,7 @@
                                                                         <tr>
                                                                             <td>{{ thisasset.assets_tag|aTag }}</td>
                                                                             <td>{{ thisasset.assetTypes_name }}</td>
-                                                                            <td>{{ thisasset['assets_notes']|nl2br }}</td>
+                                                                            <td>{% if thisasset.storage_location is defined and thisasset.storage_location|length > 0 %}{{ thisasset.storage_location[0].locations_name }}{% else %}-{% endif %}</td>
                                                                             <td>
                                                                                 {{ (thisasset.assets_dayRate ?: thisasset.assetTypes_dayRate)|money(searchResults.SEARCH.INSTANCE['instances_config_currency']) }}
                                                                             </td>
@@ -384,7 +384,7 @@
                                                                             {% for field in asset.fields %}
                                                                                 <th>{{ field }}</th>
                                                                             {% endfor %}
-                                                                            <th>Notes</th>
+                                                                            <th>Storage Location</th>
                                                                             <th>Cost/day</th>
                                                                             <th>Cost/week</th>
                                                                             <th style="width:1%"><i class="fas fa-flag"></i></th>
@@ -398,7 +398,7 @@
                                                                                 {% for field in asset.fields %}
                                                                                     <td>{{ thisasset['asset_definableFields_' ~ loop.index] }}</td>
                                                                                 {% endfor %}
-                                                                                <td>{{ thisasset['assets_notes']|nl2br }}</td>
+                                                                                <td>{% if thisasset.storage_location is defined and thisasset.storage_location|length > 0 %}{{ thisasset.storage_location[0].locations_name }}{% else %}-{% endif %}</td>
                                                                                 <td>
                                                                                     {{ (thisasset.assets_dayRate ?: asset.assetTypes_dayRate)|money(SEARCH.INSTANCE['instances_config_currency']) }}
                                                                                 </td>
@@ -462,7 +462,7 @@
                                                                             {% for field in asset.fields %}
                                                                                 <th>{{ field }}</th>
                                                                             {% endfor %}
-                                                                            <th>Notes</th>
+                                                                            <th>Storage Location</th>
                                                                             <th>Cost/day</th>
                                                                             <th>Cost/week</th>
                                                                             <th style="width:1%"><i class="fas fa-flag"></i></th>
@@ -474,7 +474,7 @@
                                                                                 {% for field in asset.fields %}
                                                                                     <td>{{ thisasset['asset_definableFields_' ~ loop.index] }}</td>
                                                                                 {% endfor %}
-                                                                                <td>{{ thisasset['assets_notes']|nl2br }}</td>
+                                                                                <td>{% if thisasset.storage_location is defined and thisasset.storage_location|length > 0 %}{{ thisasset.storage_location[0].locations_name }}{% else %}-{% endif %}</td>
                                                                                 <td>
                                                                                     {{ (thisasset.assets_dayRate ?: asset.assetTypes_dayRate)|money(SEARCH.INSTANCE['instances_config_currency']) }}
                                                                                 </td>

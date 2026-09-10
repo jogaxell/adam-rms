@@ -55,12 +55,27 @@ $RETURN = [
 ];
 
 /**
- * Enrich one physical asset row with everything an asset list needs to render it: whether it
- * clashes with another project over the search date range, and any maintenance flags/blocks.
- * Shared by the assetTypes results loop and the asset group loop so the two stay in step.
+ * Enrich one physical asset row with everything an asset list needs to render it: its storage
+ * location, whether it clashes with another project over the search date range, and any
+ * maintenance flags/blocks. Shared by the assetTypes results loop and the asset group loop so
+ * the two stay in step.
  */
-function hydrateAssetRow($tag, $dateStart, $dateEnd, $projectId) {
+function hydrateAssetRow($tag, $instanceId, $dateStart, $dateEnd, $projectId) {
     global $DBLIB;
+    //Storage location, cached per location so the same one isn't re-queried for every asset
+    static $storageLocationCache = [];
+    $tag['storage_location'] = [];
+    if (!empty($tag['assets_storageLocation'])) {
+        $storageLocationCacheKey = $instanceId . ':' . $tag['assets_storageLocation'];
+        if (!array_key_exists($storageLocationCacheKey, $storageLocationCache)) {
+            $DBLIB->where('locations_id', $tag['assets_storageLocation']);
+            $DBLIB->where('instances_id', $instanceId);
+            $DBLIB->where('locations_deleted', 0);
+            $DBLIB->where('locations_archived', 0);
+            $storageLocationCache[$storageLocationCacheKey] = $DBLIB->get('locations', 1, ['locations_id', 'locations_name']);
+        }
+        $tag['storage_location'] = $storageLocationCache[$storageLocationCacheKey];
+    }
     $tag['assignment'] = false;
     if ($dateStart and $dateEnd) {
         //Check availability
@@ -292,7 +307,7 @@ foreach ($assets as $asset) {
         if ($thisWhere) $DBLIB->where($thisWhere . ")",$thisValues);
     }
     $DBLIB->orderBy("assets.assets_tag", "ASC");
-    $assetTags = $DBLIB->get("assets", null, ["assets_id", "assets_notes", "assets_tag", "asset_definableFields_1", "asset_definableFields_2", "asset_definableFields_3", "asset_definableFields_4", "asset_definableFields_5", "asset_definableFields_6", "asset_definableFields_7", "asset_definableFields_8", "asset_definableFields_9", "asset_definableFields_10", "assets_dayRate", "assets_weekRate", "assets_value", "assets_mass", "assets_endDate"]);
+    $assetTags = $DBLIB->get("assets", null, ["assets_id", "assets_notes", "assets_tag", "asset_definableFields_1", "asset_definableFields_2", "asset_definableFields_3", "asset_definableFields_4", "asset_definableFields_5", "asset_definableFields_6", "asset_definableFields_7", "asset_definableFields_8", "asset_definableFields_9", "asset_definableFields_10", "assets_dayRate", "assets_weekRate", "assets_value", "assets_mass", "assets_endDate", "assets_storageLocation"]);
     if (!$assetTags) continue;
     $asset['count'] = count($assetTags);
     $asset['countBlocked'] = 0;
@@ -301,7 +316,7 @@ foreach ($assets as $asset) {
     $asset['thumbnail'] = $bCMS->s3List(2, $asset['assetTypes_id'],'s3files_meta_uploaded','ASC',1);
     $asset['tags'] = [];
     foreach ($assetTags as $tag) {
-        $tag = hydrateAssetRow($tag, $dateStart, $dateEnd, $RETURN['PROJECT']['ID']);
+        $tag = hydrateAssetRow($tag, $SEARCH['INSTANCE_ID'], $dateStart, $dateEnd, $RETURN['PROJECT']['ID']);
         if ($tag['assignment'] or $tag['flagsblocks']['COUNT']['BLOCK'] > 0) $asset['countBlocked']++;
         $asset['tags'][] = $tag;
     }
@@ -373,7 +388,7 @@ if ($SEARCH['SETTINGS']['SHOWGROUPS']
         $DBLIB->join("assetTypes", "assets.assetTypes_id=assetTypes.assetTypes_id", "LEFT");
         $DBLIB->orderBy("assetTypes.assetTypes_name", "ASC");
         $DBLIB->orderBy("assets.assets_tag", "ASC");
-        $members = $DBLIB->get("assets", null, ["assets.assets_id", "assets.assets_tag", "assets.assetTypes_id", "assetTypes.assetTypes_name", "assets.assets_dayRate", "assets.assets_weekRate", "assetTypes.assetTypes_dayRate", "assetTypes.assetTypes_weekRate", "assets.assets_endDate", "assets.assets_notes"]);
+        $members = $DBLIB->get("assets", null, ["assets.assets_id", "assets.assets_tag", "assets.assetTypes_id", "assetTypes.assetTypes_name", "assets.assets_dayRate", "assets.assets_weekRate", "assetTypes.assetTypes_dayRate", "assetTypes.assetTypes_weekRate", "assets.assets_endDate", "assets.assets_storageLocation"]);
         if (!$members) continue; // An empty group is not worth a card
 
         $card = [
@@ -395,7 +410,7 @@ if ($SEARCH['SETTINGS']['SHOWGROUPS']
         } else {
             $groupAssetBudget -= count($members);
             foreach ($members as $member) {
-                $member = hydrateAssetRow($member, $dateStart, $dateEnd, $RETURN['PROJECT']['ID']);
+                $member = hydrateAssetRow($member, $SEARCH['INSTANCE_ID'], $dateStart, $dateEnd, $RETURN['PROJECT']['ID']);
                 if ($member['assignment'] or $member['flagsblocks']['COUNT']['BLOCK'] > 0) $card['countBlocked']++;
                 $card['tags'][] = $member;
             }

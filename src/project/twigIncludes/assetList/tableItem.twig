@@ -1,7 +1,7 @@
 {% if type['assets']|length > 1 %}{# If there's just one item then just display it on its own #}
 <tr class="categoryFilter categoryFilter{{ categoryid }} showHideFilter" data-filter="typeFilter{{ type['assets'][0].assetTypes_id }}">
     <td><input type="checkbox" class="assetAssignmentCheckboxType" data-instanceid="{{ instanceid }}"  data-typeid="{{ type['assets'][0].assetTypes_id }}" /></td>
-    <td colspan="3">{{ type['assets']|length }}x <b>{{ type['assets'][0].manufacturers_id != 1 ? type['assets'][0].manufacturers_name ~ " - " : "" }}{{ type['assets'][0].assetTypes_name }}</b>
+    <td colspan="4">{{ type['assets']|length }}x <b>{{ type['assets'][0].manufacturers_id != 1 ? type['assets'][0].manufacturers_name ~ " - " : "" }}{{ type['assets'][0].assetTypes_name }}</b>
     </td>
     <td>
         {{ type['totals']['status'] }}
@@ -54,6 +54,7 @@
     {% endfor %}
     </td>
     {% endif %}
+    <td>{{ assetAssignment.storage_location is defined and assetAssignment.storage_location|length > 0 ? assetAssignment.storage_location[0].locations_name : '' }}</td>
     <td>
         {{ (assetAssignment.assetsAssignmentsStatus_name ? assetAssignment.assetsAssignmentsStatus_name ~ "/" : '') }}
         {% if assetAssignment.latestScan %}
