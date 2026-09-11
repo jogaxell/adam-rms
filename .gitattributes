@@ -1,0 +1,2 @@
+# Shell scripts run inside Linux containers; a CRLF checkout breaks the shebang ("bad interpreter")
+*.sh text eol=lf
