@@ -13,12 +13,12 @@
                 <form class="input-group input-group-sm"  method="GET">
                     <div class="input-group-prepend">
                         <select class="custom-select custom-select-sm" id="projectsSort" title="Sort projects" aria-label="Sort projects">
-                            {% for key, option in SORT.options %}
-                            <option value="{{ option.query }}"{% if key == SORT.current %} selected{% endif %}>{{ option.label }}{% if key == SORT.business %} (business default){% endif %}</option>
+                            {% for key, option in PROJECTSSORT.options %}
+                            <option value="{{ option.query }}"{% if key == PROJECTSSORT.current %} selected{% endif %}>{{ option.label }}{% if key == PROJECTSSORT.business %} (business default){% endif %}</option>
                             {% endfor %}
                         </select>
                     </div>
-                    {% if SORT.current != SORT.business %}<input type="hidden" name="sort" value="{{ SORT.current }}" />{% endif %}
+                    {% if PROJECTSSORT.current != PROJECTSSORT.business %}<input type="hidden" name="sort" value="{{ PROJECTSSORT.current }}" />{% endif %}
                     <input type="text" name="q" class="form-control" placeholder="Search" value="{{ search }}" />
                     <div class="input-group-append">
                         <button type="submit" class="btn btn-default"><i class="fa fa-search" title="Search"></i></button>

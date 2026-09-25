@@ -36,9 +36,9 @@ if (isset($_GET['location'])) {
 
 //Sort menu - starts on the business's chosen order (Business Settings), ?sort= overrides it for this view
 $sort = $bCMS->projectsSortKey($AUTH->data['instance'], $_GET['sort'] ?? null);
-$PAGEDATA['SORT'] = ["current" => $sort, "business" => $bCMS->projectsSortKey($AUTH->data['instance']), "options" => []];
+$PAGEDATA['PROJECTSSORT'] = ["current" => $sort, "business" => $bCMS->projectsSortKey($AUTH->data['instance']), "options" => []];
 foreach ($bCMS->projectsSorts() as $key => $option) {
-    $PAGEDATA['SORT']['options'][$key] = ["label" => $option['label'], "query" => http_build_query(array_merge($_GET, ["sort" => $key, "page" => 1]))];
+    $PAGEDATA['PROJECTSSORT']['options'][$key] = ["label" => $option['label'], "query" => http_build_query(array_merge($_GET, ["sort" => $key, "page" => 1]))];
 }
 
 if (isset($_GET['page'])) $page = $bCMS->sanitizeString($_GET['page']);
