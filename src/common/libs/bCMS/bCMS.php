@@ -497,6 +497,67 @@ class bCMS
     }
   }
   /**
+   * The project documents that can be printed from a project (the type= of project/projectInvoice.php).
+   */
+  const PROJECT_DOCUMENT_TYPES = ["invoice" => "Invoice", "quote" => "Quote", "deliveryNote" => "Delivery Note"];
+  /**
+   * The "include" options of the project document dialog (the checkbox names projectInvoice.php reads),
+   * with the defaults used before a business set its own. An option missing from a type's defaults
+   * doesn't apply to that document, and the dialog hides it.
+   *
+   * @return array key => ["label" => string, "defaults" => [documentType => bool]]
+   */
+  function projectDocumentOptions()
+  {
+    $all = function ($default) {
+      return ["invoice" => $default, "quote" => $default, "deliveryNote" => $default];
+    };
+    return [
+      "instancelogo" => ["label" => "Business Logo", "defaults" => $all(true)],
+      "addresses" => ["label" => "Addresses", "defaults" => $all(true)],
+      "pmdetails" => ["label" => "Project Manager", "defaults" => $all(true)],
+      "totalmass" => ["label" => "Total Mass", "defaults" => $all(true)],
+      "totalvalue" => ["label" => "Total Value", "defaults" => $all(true)],
+      "venue" => ["label" => "Venue", "defaults" => $all(true)],
+      "invoiceNotes" => ["label" => "Invoice Notes", "defaults" => $all(true)],
+      "assets" => ["label" => "Equipment List", "defaults" => $all(true)],
+      "showAll" => ["label" => "Individual Items in Equipment List", "defaults" => $all(false)],
+      "flagsBlocks" => ["label" => "Flags & Blocks in Equipment List", "defaults" => ["invoice" => false, "quote" => false]],
+      "checkboxes" => ["label" => "Equipment Checkboxes", "defaults" => $all(false)],
+      "comments" => ["label" => "Equipment Comments", "defaults" => $all(false)],
+      "masses" => ["label" => "Equipment Masses", "defaults" => $all(true)],
+      "finance" => ["label" => "Financial Totals", "defaults" => ["invoice" => true, "quote" => true]],
+      "prices" => ["label" => "Prices", "defaults" => ["invoice" => true, "quote" => true]],
+      "discounts" => ["label" => "Equipment Discounts", "defaults" => ["invoice" => true, "quote" => true]],
+      "subHires" => ["label" => "Additional Hires", "defaults" => $all(true)],
+      "sales" => ["label" => "Sales", "defaults" => $all(true)],
+      "staff" => ["label" => "Staff", "defaults" => $all(true)],
+      "paymentTerms" => ["label" => "Invoice/Quotation Footer", "defaults" => $all(true)],
+    ];
+  }
+  /**
+   * The business's default "include" options per project document (instances_documentDefaults, a JSON object of
+   * documentType => [option => bool]), filled in from projectDocumentOptions() for anything it hasn't set.
+   * Unknown document types and options, and options that don't apply to a document, are ignored.
+   *
+   * @return array documentType => [option => bool]
+   */
+  function projectDocumentDefaults($instance)
+  {
+    $stored = json_decode($instance['instances_documentDefaults'] ?? '', true);
+    if (!is_array($stored)) $stored = [];
+    $defaults = [];
+    foreach (array_keys(self::PROJECT_DOCUMENT_TYPES) as $type) {
+      $defaults[$type] = [];
+      foreach ($this->projectDocumentOptions() as $key => $option) {
+        if (!array_key_exists($type, $option['defaults'])) continue;
+        $value = $stored[$type][$key] ?? null;
+        $defaults[$type][$key] = is_bool($value) ? $value : $option['defaults'][$type];
+      }
+    }
+    return $defaults;
+  }
+  /**
    * The project orders a business can choose for the sidebar, which is also the Projects page's starting order.
    * The first entry is the default, and matches the sidebar order used before the setting existed.
    *

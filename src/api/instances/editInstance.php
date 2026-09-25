@@ -12,9 +12,15 @@ foreach ($_POST['formData'] as $item) {
 if (isset($array['instances_termsAndPayment'])) $array['instances_termsAndPayment'] = $bCMS->cleanString($array['instances_termsAndPayment']);
 if (isset($array['instances_quoteTerms'])) $array['instances_quoteTerms'] = $bCMS->cleanString($array['instances_quoteTerms']);
 if (array_key_exists('instances_projectsSidebarSort', $array) and !(is_string($array['instances_projectsSidebarSort']) and array_key_exists($array['instances_projectsSidebarSort'], $bCMS->projectsSorts()))) finish(false, ["code" => "INVALID-SORT", "message" => "Unknown project order"]);
+if (array_key_exists('instances_documentDefaults', $array)) {
+    //Rebuild from the known options, so only real document types and options, as true/false, are stored
+    $submitted = is_string($array['instances_documentDefaults']) ? json_decode($array['instances_documentDefaults'], true) : null;
+    if (!is_array($submitted)) finish(false, ["code" => "INVALID-DOCUMENT-DEFAULTS", "message" => "Invalid document defaults"]);
+    $array['instances_documentDefaults'] = json_encode($bCMS->projectDocumentDefaults(["instances_documentDefaults" => $array['instances_documentDefaults']]));
+}
 
 $DBLIB->where("instances_id",$AUTH->data['instance']["instances_id"]);
-$result = $DBLIB->update("instances", array_intersect_key( $array, array_flip( ["instances_name","instances_address","instances_phone","instances_email","instances_website","instances_weekStartDates","instances_logo","instances_emailHeader","instances_termsAndPayment", "instances_quoteTerms", "instances_cableColours", "instances_projectsSidebarSort"] ) ));
+$result = $DBLIB->update("instances", array_intersect_key( $array, array_flip( ["instances_name","instances_address","instances_phone","instances_email","instances_website","instances_weekStartDates","instances_logo","instances_emailHeader","instances_termsAndPayment", "instances_quoteTerms", "instances_cableColours", "instances_projectsSidebarSort", "instances_documentDefaults"] ) ));
 echo $DBLIB->getLastError();
 if (!$result) finish(false, ["code" => "UPDATE-FAIL", "message"=> "Could not update instance"]);
 else {
@@ -131,6 +137,11 @@ Requires Instance Permission BUSINESS:BUSINESS_SETTINGS:EDIT
  *                 property="instances_projectsSidebarSort",
  *                 type="string",
  *                 description="Order of projects in the sidebar, and the starting order on the Projects page - one of deliverStart, useStart, name, createdNewest, createdOldest",
+ *             ),
+ *             @OA\Property(
+ *                 property="instances_documentDefaults",
+ *                 type="json",
+ *                 description="Default include options per project document: {invoice|quote|deliveryNote: {option: true|false}}. Unknown keys are dropped and missing ones keep their default",
  *             ),
  *             @OA\Property(
  *                 property="instances_publicConfig",

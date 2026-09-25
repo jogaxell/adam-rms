@@ -59,6 +59,66 @@
                 });
             </script>
         </div>
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Document Defaults</h3>
+            </div>
+            <div class="card-body p-0">
+                <p class="text-muted px-3 pt-3 mb-2">Choose what is ticked by default when you print an invoice, quote or delivery note from a project. You can still change the ticks before printing. Options only show in the print dialog when they apply to the project, for example equipment options for projects that have equipment.</p>
+                <table class="table table-sm table-striped mb-0" id="documentDefaults">
+                    <thead>
+                        <tr>
+                            <th class="pl-3">Include</th>
+                            {% for type, label in DOCUMENTDEFAULTS.types %}
+                            <th class="text-center" style="width: 8rem;">{{ label }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for key, option in DOCUMENTDEFAULTS.options %}
+                        <tr>
+                            <td class="pl-3">{{ option.label }}</td>
+                            {% for type, label in DOCUMENTDEFAULTS.types %}
+                            <td class="text-center">
+                                {% if DOCUMENTDEFAULTS.current[type][key] is defined %}
+                                <input type="checkbox" data-document="{{ type }}" data-option="{{ key }}" aria-label="{{ option.label }} on {{ label }}"{% if DOCUMENTDEFAULTS.current[type][key] %} checked{% endif %}{% if not "BUSINESS:BUSINESS_SETTINGS:EDIT"|instancePermissions %} disabled{% endif %}>
+                                {% else %}
+                                <span class="text-muted" title="Not available on a {{ label|lower }}">–</span>
+                                {% endif %}
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-footer">
+                {% if "BUSINESS:BUSINESS_SETTINGS:EDIT"|instancePermissions %}
+                <button id="saveDocumentDefaults" class="btn btn-default">Save</button>
+                {% endif %}
+            </div>
+            <script>
+                $(document).ready(function() {
+                    {% if "BUSINESS:BUSINESS_SETTINGS:EDIT"|instancePermissions %}
+                    $('#saveDocumentDefaults').on('click', function() {
+                        var defaults = {};
+                        $('#documentDefaults input[data-document]').each(function () {
+                            var type = $(this).data('document');
+                            defaults[type] = defaults[type] || {};
+                            defaults[type][$(this).data('option')] = $(this).prop('checked');
+                        });
+                        ajaxcall("instances/editInstance.php", {
+                            'formData': [
+                                { 'name': 'instances_documentDefaults', 'value': JSON.stringify(defaults) }
+                            ]
+                        }, function (data) {
+                            location.reload();
+                        }, false);
+                    });
+                    {% endif %}
+                });
+            </script>
+        </div>
    </div>
 </div>
 {% endblock %}

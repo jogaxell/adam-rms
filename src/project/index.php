@@ -165,6 +165,8 @@ $PAGEDATA['potentialProjectManagers'] = $DBLIB->get('users', null, ["users.users
 //Edit Options - can create sub projects?
 $PAGEDATA['canCreateSubProjects'] = $bCMS->instanceHasProjectCapacity($AUTH->data['instance']['instances_id']);
 
+$PAGEDATA['DOCUMENTDEFAULTS'] = $bCMS->projectDocumentDefaults($AUTH->data['instance']); //Ticks preselected in the invoice/quote/delivery note dialog
+
 if (isset($_GET['list']) and $PAGEDATA['project']['projectsTypes_config_assets'] == 1 and (count($PAGEDATA['FINANCIALS']['assetsAssigned'])>0 or count($PAGEDATA['FINANCIALS']['assetsAssignedSUB'])>0)) echo $TWIG->render('project/project_assetsPage.twig', $PAGEDATA);
 else echo $TWIG->render('project/project_index.twig', $PAGEDATA);
 ?>

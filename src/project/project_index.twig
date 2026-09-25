@@ -821,27 +821,31 @@
     </div>
     <script>
         $(document).ready(function () {
+            // The business's default ticks per document (Business Settings > Invoices > Document Defaults)
+            var documentDefaults = {{ DOCUMENTDEFAULTS|json_encode|raw }};
             $('#pdfGenerateModal').on('show.bs.modal', function (e) {
-                 if ($(e.relatedTarget).data('delivery-note')){
+                var type = "invoice";
+                if ($(e.relatedTarget).data('delivery-note')) {
+                    type = "deliveryNote";
                     $("#pdfGenerateModal .modal-title").text("Create Delivery Note");
-                    $('#pdfGenerateModal input[name="type"]').val("deliveryNote");
-                    $('#pdfGenerateModal input[name="finance"]').prop('checked', false).parent().hide();
-                    $('#pdfGenerateModal input[name="prices"]').prop('checked', false).parent().hide();
-                    $('#pdfGenerateModal input[name="discounts"]').prop('checked', false).parent().hide();
-                    $('#pdfGenerateModal input[name="flagsBlocks"]').prop('checked', false).parent().hide();
+                } else if ($(e.relatedTarget).data('quote')) {
+                    type = "quote";
+                    $("#pdfGenerateModal .modal-title").text("Create Quote");
                 } else {
-                    $('#pdfGenerateModal input[name="finance"]').prop('checked', true).parent().show();
-                    $('#pdfGenerateModal input[name="prices"]').prop('checked', true).parent().show();
-                    $('#pdfGenerateModal input[name="discounts"]').prop('checked', true).parent().show();
-                    $('#pdfGenerateModal input[name="flagsBlocks"]').prop('checked', false).parent().show();
-                    if ($(e.relatedTarget).data('quote')) {
-                        $("#pdfGenerateModal .modal-title").text("Create Quote");
-                        $('#pdfGenerateModal input[name="type"]').val("quote");
-                    } else {
-                        $("#pdfGenerateModal .modal-title").text("Create Invoice");
-                        $('#pdfGenerateModal input[name="type"]').val("invoice");
-                    }
+                    $("#pdfGenerateModal .modal-title").text("Create Invoice");
                 }
+                $('#pdfGenerateModal input[name="type"]').val(type);
+                $('#pdfGenerateModal input.form-check-input').each(function () {
+                    var known = Object.keys(documentDefaults).some(function (documentType) { return this.name in documentDefaults[documentType]; }, this);
+                    if (!known) return; // not a document option - leave it as it is
+                    if (this.name in documentDefaults[type]) {
+                        $(this).parent().show();
+                        if (!this.disabled) this.checked = documentDefaults[type][this.name]; // the logo stays off when there is none
+                    } else { // doesn't apply to this document
+                        this.checked = false;
+                        $(this).parent().hide();
+                    }
+                });
             });
             $("#assetAssignmentCheckboxAll").click(function () {
                 $(".assetAssignmentCheckbox").prop('checked', $(this).prop('checked'));
