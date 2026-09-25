@@ -19,16 +19,19 @@ $DBLIB->where("payments.payments_deleted", 0);
 $DBLIB->where("payments.payments_type", [2, 3, 4], "IN"); //Sales, additional hires and staff only
 $DBLIB->join("projects", "payments.projects_id=projects.projects_id", "LEFT");
 $DBLIB->where("payments.payments_id", $array['payments_id']);
-$payment = $DBLIB->getone("payments", ["payments.payments_id", "payments.projects_id", "payments_type", "payments_amount", "payments_quantity"]);
+$payment = $DBLIB->getone("payments", ["payments.payments_id", "payments.projects_id", "payments_type", "payments_amount", "payments_quantity", "payments_supplier", "payments_comment"]);
 if (!$payment) finish(false);
 
 $currency = new Currency($AUTH->data['instance']['instances_config_currency']);
 $moneyParser = new DecimalMoneyParser(new ISOCurrencies());
+$amount = $moneyParser->parse(($array['payments_amount'] ?? null) ?: "0", $currency);
+if ($amount->isNegative()) finish(false, ["code" => "PARAM-ERROR", "message"=> "Amount can't be negative"]);
 $update = [
-    "payments_quantity" => ($array['payments_quantity'] ?? null) ?: 1,
+    //The column is an int, so a fractional quantity would be rounded there but not in the finance cache
+    "payments_quantity" => max(1, (int)($array['payments_quantity'] ?? 1)),
     "payments_supplier" => $array['payments_supplier'] ?? null,
     "payments_comment" => $array['payments_comment'] ?? null,
-    "payments_amount" => $moneyParser->parse(($array['payments_amount'] ?? null) ?: "0", $currency)->getAmount(),
+    "payments_amount" => $amount->getAmount(),
 ];
 
 $projectFinanceCacher = new projectFinanceCacher($payment['projects_id']);
@@ -41,7 +44,9 @@ $newAmount = (new Money($update['payments_amount'], $currency))->multiply($updat
 $projectFinanceCacher->adjustPayment($payment['payments_type'], $oldAmount, true);
 $projectFinanceCacher->adjustPayment($payment['payments_type'], $newAmount, false);
 
-$bCMS->auditLog("UPDATE", "payments", $payment['payments_id'], $AUTH->data['users_userid'], null, $payment['projects_id']);
+//The row is overwritten, so the audit log is the only record of what it was before
+$before = array_intersect_key($payment, $update);
+$bCMS->auditLog("UPDATE", "payments", ["payments_id" => $payment['payments_id'], "from" => $before, "to" => $update], $AUTH->data['users_userid'], null, $payment['projects_id'], $payment['payments_id']);
 
 if ($projectFinanceCacher->save()) finish(true);
 else finish(false,["message"=>"Finance Cacher Save failed"]);
