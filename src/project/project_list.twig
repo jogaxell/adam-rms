@@ -67,7 +67,7 @@
                 {% for project in PROJECTSLIST %}
                     {% if archive == false and project.projects_archived == 1 %}
                         {% set archive = true %}
-                        <tr style="background-color: #ffffff;">
+                        <tr class="table-active">
                             <td colspan="8">
                                 <b>Archived Projects</b>
                             </td>
