@@ -17,6 +17,7 @@ This is a fork of [adam-rms/adam-rms](https://github.com/adam-rms/adam-rms). Eve
 - **Storage Location on every asset list** — replaces the Notes column on asset, project-asset and search-result tables, and is preferred over the last scan on the asset page. See where an item lives without opening it.
 - **Dispatch scans labelled in history** — a location set by Location Dispatch is noted as *Dispatched from Project …* in the asset's scan log, so the audit trail shows where each location came from.
 - **Choosable sidebar project order**: in *Business Settings → Basic Settings*, admins choose how the sidebar's project list is sorted (delivery start date, event start date, name, newest or oldest first), so the projects that matter most are at the top for the whole team.
+- **Sidebar keeps its scroll position**: opening a page from the sidebar no longer jumps the menu back to the top. Each browser window remembers where you were, so a long project list doesn't need scrolling again after every click.
 - **Container starts reliably** — the Docker image waits for the database before migrating and exits on a failed migration instead of quietly serving an unmigrated schema after a host reboot, and shell scripts are pinned to LF so a Windows checkout no longer boot-loops the container.
 
 AdamRMS is a free, open source advanced Rental Management System for Theatre, AV & Broadcast. It helps rental businesses track assets, manage projects, handle client relationships, and streamline billing — all from a single web-based platform.

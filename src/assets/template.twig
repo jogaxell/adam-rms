@@ -189,6 +189,48 @@ ignoreURLs: ['searchUser.php'] // Ignore user searches
                     .addClass("active");
                 });
 
+                /** keep the sidebar's scroll position across page loads, per browser window */
+                (function () {
+                    var storageKey = "adamrms.sidebarScrollY";
+                    // AdminLTE wraps the sidebar in OverlayScrollbars on window load (layout-fixed), which then does the scrolling
+                    function sidebarScroller() {
+                        var $sidebar = $(".main-sidebar .sidebar");
+                        if (!$sidebar.length) return null;
+                        var instance = typeof $.fn.overlayScrollbars !== "undefined" ? $sidebar.overlayScrollbars() : null;
+                        if (instance) return {
+                            get: function () { return instance.scroll().position.y; },
+                            set: function (y) { instance.scroll({ y: y }, 0); },
+                        };
+                        return {
+                            get: function () { return $sidebar.scrollTop(); },
+                            set: function (y) { $sidebar.scrollTop(y); },
+                        };
+                    }
+                    function save() {
+                        var scroller = sidebarScroller();
+                        if (!scroller) return;
+                        try {
+                            sessionStorage.setItem(storageKey, String(Math.round(scroller.get())));
+                        } catch (e) {}
+                    }
+                    function restore(retried) {
+                        var saved = null;
+                        try {
+                            saved = parseInt(sessionStorage.getItem(storageKey), 10);
+                        } catch (e) {}
+                        if (!saved) return;
+                        if (!retried && typeof $.fn.overlayScrollbars !== "undefined" && $("body").hasClass("layout-fixed") && !$(".main-sidebar .sidebar").overlayScrollbars()) {
+                            window.requestAnimationFrame(function () { restore(true); }); // OverlayScrollbars not applied yet
+                            return;
+                        }
+                        var scroller = sidebarScroller();
+                        if (scroller) scroller.set(saved);
+                    }
+                    $(document).on("click", ".main-sidebar a[href]", save);
+                    $(window).on("pagehide beforeunload", save);
+                    $(window).on("load", function () { restore(false); }); // registered after adminlte.js, so its layout is set up first
+                })();
+
 		</script>
         <!-- parse-ignore-end -->
 
