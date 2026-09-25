@@ -75,12 +75,7 @@ if ($CONFIG['LINKS_TERMSOFSERVICEURL'] and ($PAGEDATA['USERDATA']['users_termsAc
     $DBLIB->join("clients", "projects.clients_id=clients.clients_id", "LEFT");
     $DBLIB->join("projectsTypes", "projects.projectsTypes_id=projectsTypes.projectsTypes_id", "LEFT");
     $DBLIB->join("projectsStatuses", "projects.projectsStatuses_id=projectsStatuses.projectsStatuses_id", "LEFT");
-    $projectsSidebarSorts = $bCMS->projectsSidebarSorts();
-    $projectsSidebarSort = $projectsSidebarSorts[$AUTH->data['instance']['instances_projectsSidebarSort'] ?? ''] ?? reset($projectsSidebarSorts); //Unknown or unset falls back to the default
-    foreach ($projectsSidebarSort['orderBy'] as $order) {
-        $DBLIB->orderBy($order[0], $order[1]);
-    }
-    unset($projectsSidebarSorts, $projectsSidebarSort);
+    $bCMS->applyProjectsSort($AUTH->data['instance']);
     $projects = $DBLIB->get("projects", null, ["projects_id", "projectsTypes.*", "projects_archived", "projects_name", "clients_name", "projects_dates_deliver_start", "projects_dates_deliver_end", "projects_dates_use_start", "projects_dates_use_end", "projectsStatuses.projectsStatuses_name", "projectsStatuses.projectsStatuses_foregroundColour", "projectsStatuses.projectsStatuses_backgroundColour", "projectsStatuses.projectsStatuses_fontAwesome", "projects_manager", "projects_parent_project_id"]);
     $PAGEDATA['projects'] = [];
     $tempProjectKeys = []; //Track the Project IDs of all projects and their place in the array (allows us to preserve sorting)

@@ -472,7 +472,21 @@ class bCMS
     return true;
   }
   /**
-   * The orders a business can choose for the project list in the sidebar (instances_projectsSidebarSort).
+   * Add the business's chosen project order (instances_projectsSidebarSort) to the next $DBLIB query.
+   * Used by the sidebar and the project list. $sortKey overrides the business's choice (the Projects page's sort menu).
+   * Unknown or unset values fall back to the business's choice, then to the default.
+   */
+  function applyProjectsSort($instance, $sortKey = null)
+  {
+    global $DBLIB;
+    $sorts = $this->projectsSidebarSorts();
+    $sort = $sorts[(string) $sortKey] ?? $sorts[$instance['instances_projectsSidebarSort'] ?? ''] ?? reset($sorts);
+    foreach ($sort['orderBy'] as $order) {
+      $DBLIB->orderBy($order[0], $order[1]);
+    }
+  }
+  /**
+   * The orders a business can choose for the project list in the sidebar and on the Projects page (instances_projectsSidebarSort).
    * The first entry is the default, and matches the order used before the setting existed.
    *
    * @return array key => ["label" => string, "orderBy" => [[column, direction], ...]]

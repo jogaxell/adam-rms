@@ -11,12 +11,25 @@
             {% endif %}
             <div class="card-tools">
                 <form class="input-group input-group-sm"  method="GET">
+                    <div class="input-group-prepend">
+                        <select class="custom-select custom-select-sm" id="projectsSort" title="Sort projects" aria-label="Sort projects">
+                            {% for key, option in SORT.options %}
+                            <option value="{{ option.query }}"{% if key == SORT.current %} selected{% endif %}>{{ option.label }}{% if key == SORT.business %} (business default){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% if SORT.current != SORT.business %}<input type="hidden" name="sort" value="{{ SORT.current }}" />{% endif %}
                     <input type="text" name="q" class="form-control" placeholder="Search" value="{{ search }}" />
                     <div class="input-group-append">
                         <button type="submit" class="btn btn-default"><i class="fa fa-search" title="Search"></i></button>
                         {% if "PROJECTS:CREATE"|instancePermissions %}<a type="button" class="btn btn-default" href="{{ CONFIG.ROOTURL }}/project/new.php" title="Add new project"><i class="fa fa-plus"></i></a>{% endif %}
                     </div>
                 </form>
+                <script>
+                    $("#projectsSort").on("change", function () {
+                        window.location.search = "?" + $(this).val();
+                    });
+                </script>
             </div>
         </div>
         <div class="card-body p-0">
