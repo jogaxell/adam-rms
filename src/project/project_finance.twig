@@ -167,8 +167,8 @@
 								{% if currentSupplier != payment.payments_supplier %}
 									{% set currentSupplier = payment.payments_supplier %}
 									{% if payment.payments_supplier != "" %}
-										<tr>
-											<td colspan="99" style="background-color: #F5F5F5;">
+										<tr class="table-active">
+											<td colspan="99">
 												<b>{{ payment.payments_supplier }}</b>
 											</td>
 										</tr>
@@ -182,6 +182,11 @@
 									<td>
 										{% if  CONFIG.FILES_ENABLED == "Enabled" and "PROJECTS:PROJECT_PAYMENTS:VIEW:FILE_ATTACHMENTS"|instancePermissions %}
 											<button data-toggle="modal" data-target="#filesModal{{ payment.payments_id }}" type="button" class="btn btn-outline-secondary btn-sm">{{ (payment.files|length > 0 ? payment.files|length ~ '&nbsp;' : '')|raw }}<i class="fas fa-paperclip" style="display:inline;"></i>
+											</button>
+										{% endif %}
+										{% if "PROJECTS:PROJECT_PAYMENTS:CREATE"|instancePermissions %}
+											<button title="Edit" class="btn btn-sm btn-default editPaymentButton" data-paymentid="{{ payment.payments_id }}" data-type="{{ payment.payments_type }}" data-quantity="{{ payment.payments_quantity }}" data-supplier="{{ payment.payments_supplier }}" data-amount="{{ payment.payments_amount|moneyDecimal }}" data-comment="{{ payment.payments_comment }}">
+												<i class="fa fa-pen"></i>
 											</button>
 										{% endif %}
 										{% if "PROJECTS:PROJECT_PAYMENTS:DELETE"|instancePermissions %}
@@ -219,8 +224,8 @@
 								{% if currentSupplier != payment.payments_supplier %}
 									{% set currentSupplier = payment.payments_supplier %}
 									{% if payment.payments_supplier != "" %}
-										<tr>
-											<td colspan="99" style="background-color: #F5F5F5;">
+										<tr class="table-active">
+											<td colspan="99">
 												<b>{{ payment.payments_supplier }}</b>
 											</td>
 										</tr>
@@ -234,6 +239,11 @@
 									<td>
 										{% if CONFIG.FILES_ENABLED == "Enabled" and "PROJECTS:PROJECT_PAYMENTS:VIEW:FILE_ATTACHMENTS"|instancePermissions %}
 											<button data-toggle="modal" data-target="#filesModal{{ payment.payments_id }}" type="button" class="btn btn-outline-secondary btn-sm">{{ (payment.files|length > 0 ? payment.files|length ~ '&nbsp;' : '')|raw }}<i class="fas fa-paperclip" style="display:inline;"></i>
+											</button>
+										{% endif %}
+										{% if "PROJECTS:PROJECT_PAYMENTS:CREATE"|instancePermissions %}
+											<button title="Edit" class="btn btn-sm btn-default editPaymentButton" data-paymentid="{{ payment.payments_id }}" data-type="{{ payment.payments_type }}" data-quantity="{{ payment.payments_quantity }}" data-supplier="{{ payment.payments_supplier }}" data-amount="{{ payment.payments_amount|moneyDecimal }}" data-comment="{{ payment.payments_comment }}">
+												<i class="fa fa-pen"></i>
 											</button>
 										{% endif %}
 										{% if "PROJECTS:PROJECT_PAYMENTS:DELETE"|instancePermissions %}
@@ -277,6 +287,11 @@
 									<td>
 										{% if CONFIG.FILES_ENABLED == "Enabled" and "PROJECTS:PROJECT_PAYMENTS:VIEW:FILE_ATTACHMENTS"|instancePermissions %}
 											<button data-toggle="modal" data-target="#filesModal{{ payment.payments_id }}" type="button" class="btn btn-outline-secondary btn-sm">{{ (payment.files|length > 0 ? payment.files|length ~ '&nbsp;' : '')|raw }}<i class="fas fa-paperclip" style="display:inline;"></i>
+											</button>
+										{% endif %}
+										{% if "PROJECTS:PROJECT_PAYMENTS:CREATE"|instancePermissions %}
+											<button title="Edit" class="btn btn-sm btn-default editPaymentButton" data-paymentid="{{ payment.payments_id }}" data-type="{{ payment.payments_type }}" data-quantity="{{ payment.payments_quantity }}" data-supplier="{{ payment.payments_supplier }}" data-amount="{{ payment.payments_amount|moneyDecimal }}" data-comment="{{ payment.payments_comment }}">
+												<i class="fa fa-pen"></i>
 											</button>
 										{% endif %}
 										{% if "PROJECTS:PROJECT_PAYMENTS:DELETE"|instancePermissions %}

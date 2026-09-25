@@ -454,6 +454,7 @@
             </div>  
             <div class="modal-body">
                 <form id="newPaymentModal-form">
+                    <input type="hidden" id="newPaymentModal-form-id" name="payments_id" value=""/>
                     <input type="hidden" id="newPaymentModal-form-type" name="payments_type" value="1"/>
                     <input type="hidden" name="projects_id" value="{{ project.projects_id }}"/>
                     <div class="input-group newPaymentModal-paymentOnly" style="margin-bottom: 5px;">
@@ -486,23 +487,23 @@
                         <div class="input-group-prepend">
                             <span class="input-group-text">Quantity</span>
                         </div>
-                        <input class="form-control" type="number" step="1" min="0" value="1" name="payments_quantity">
+                        <input class="form-control" type="number" step="1" min="0" value="1" name="payments_quantity" id="newPaymentModal-form-quantity">
                     </div>
                     <div class="input-group mb-3 newPaymentModal-nonPaymentOnly">
                         <div class="input-group-prepend">
                             <span class="input-group-text">Supplier</span>
                         </div>
-                        <input class="form-control" type="text" name="payments_supplier">
+                        <input class="form-control" type="text" name="payments_supplier" id="newPaymentModal-form-supplier">
                     </div>
                     <div class="input-group" style="margin-bottom: 5px;">
                         <div class="input-group-prepend"><span class="input-group-text">Description</span></div>
-                        <textarea class="form-control" rows="3" name="payments_comment"  placeholder=""></textarea>
+                        <textarea class="form-control" rows="3" name="payments_comment" id="newPaymentModal-form-comment" placeholder=""></textarea>
                     </div>
                     <div class="input-group mb-3">
                         <div class="input-group-prepend">
                             <span class="input-group-text">Amount {{ moneySymbol() }}</span>
                         </div>
-                        <input class="form-control" type="number" step="0.01" min="0" value="0" name="payments_amount">
+                        <input class="form-control" type="number" step="0.01" min="0" value="0" name="payments_amount" id="newPaymentModal-form-amount">
                     </div>
                 </form>
             </div>
@@ -1385,6 +1386,14 @@
             });
             $(".newPayment").click(function () {
                 var type = $(this).data("type");
+                if ($("#newPaymentModal-form-id").val() !== "") {
+                    //The modal was last used to edit an entry, so clear that entry's values out
+                    $("#newPaymentModal-form-id").val("");
+                    $("#newPaymentModal-form-quantity").val(1);
+                    $("#newPaymentModal-form-supplier").val("");
+                    $("#newPaymentModal-form-comment").val("");
+                    $("#newPaymentModal-form-amount").val(0);
+                }
                 $("#newPaymentModal-form-type").val(type);
                 $("#newPaymentModal").modal('show');
                 $(".newPaymentModal-paymentOnly").hide();
@@ -1406,9 +1415,38 @@
                         break;
                 }
             });
+            $(".editPaymentButton").click(function () {
+                var type = parseInt($(this).attr("data-type"));
+                $("#newPaymentModal-form-id").val($(this).attr("data-paymentid"));
+                $("#newPaymentModal-form-type").val(type);
+                $("#newPaymentModal-form-quantity").val($(this).attr("data-quantity"));
+                $("#newPaymentModal-form-supplier").val($(this).attr("data-supplier"));
+                $("#newPaymentModal-form-comment").val($(this).attr("data-comment"));
+                $("#newPaymentModal-form-amount").val($(this).attr("data-amount"));
+                $(".newPaymentModal-paymentOnly").hide();
+                $(".newPaymentModal-nonPaymentOnly").show();
+                switch(type) {
+                    case 2:
+                        $("#newPaymentModal-title").html("Edit Sales Item");
+                        break;
+                    case 3:
+                        $("#newPaymentModal-title").html("Edit Additional Hire Cost");
+                        break;
+                    case 4:
+                        $("#newPaymentModal-title").html("Edit Staff cost");
+                        break;
+                }
+                $("#newPaymentModal").modal('show');
+            });
             $("#newPaymentModal-button").click(function () {
                 var formData = $("#newPaymentModal-form").serializeArray();
-                ajaxcall("projects/newPayment.php", {formData}, function (data) {
+                var endpoint = "projects/editPayment.php";
+                if ($("#newPaymentModal-form-id").val() === "") {
+                    //newPayment.php inserts every field it is sent, so leave the empty id out
+                    formData = formData.filter(function (field) { return field.name !== "payments_id"; });
+                    endpoint = "projects/newPayment.php";
+                }
+                ajaxcall(endpoint, {formData}, function (data) {
                     location.reload();
                 });
             });
