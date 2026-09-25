@@ -49,6 +49,15 @@
                             <label>Website</label>
                             <input required type="url" class="form-control" value="{{ USERDATA.instance.instances_website }}" name="instances_website">
                         </div>
+                        <div class="form-group">
+                            <label>Sidebar project order</label>
+                            <select class="form-control" name="instances_projectsSidebarSort">
+                                {% for key, sort in projectsSidebarSorts %}
+                                <option value="{{ key }}"{% if key == USERDATA.instance.instances_projectsSidebarSort or (loop.first and USERDATA.instance.instances_projectsSidebarSort not in projectsSidebarSorts|keys) %} selected{% endif %}>{{ sort.label }}{% if loop.first %} (default){% endif %}</option>
+                                {% endfor %}
+                            </select>
+                            <small class="form-text text-muted">How the active projects are ordered in the sidebar, for everyone in this business. Projects without a date are listed first when sorting by date.</small>
+                        </div>
                 </div>
                 <div class="card-footer">
                     {% if "BUSINESS:BUSINESS_SETTINGS:EDIT"|instancePermissions %}

@@ -471,4 +471,20 @@ class bCMS
       return false;
     return true;
   }
+  /**
+   * The orders a business can choose for the project list in the sidebar (instances_projectsSidebarSort).
+   * The first entry is the default, and matches the order used before the setting existed.
+   *
+   * @return array key => ["label" => string, "orderBy" => [[column, direction], ...]]
+   */
+  function projectsSidebarSorts()
+  {
+    return [
+      "deliverStart" => ["label" => "Delivery start date", "orderBy" => [["projects.projects_dates_deliver_start", "ASC"], ["projects.projects_name", "ASC"], ["projects.projects_created", "ASC"]]],
+      "useStart" => ["label" => "Event start date", "orderBy" => [["projects.projects_dates_use_start", "ASC"], ["projects.projects_name", "ASC"], ["projects.projects_created", "ASC"]]],
+      "name" => ["label" => "Project name", "orderBy" => [["projects.projects_name", "ASC"], ["projects.projects_created", "ASC"]]],
+      "createdNewest" => ["label" => "Newest first", "orderBy" => [["projects.projects_created", "DESC"], ["projects.projects_id", "DESC"]]],
+      "createdOldest" => ["label" => "Oldest first", "orderBy" => [["projects.projects_created", "ASC"], ["projects.projects_id", "ASC"]]],
+    ];
+  }
 }

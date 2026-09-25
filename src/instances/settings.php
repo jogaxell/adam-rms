@@ -10,6 +10,8 @@ $DBLIB->where("instances_id", $AUTH->data['instance']['instances_id']);
 $DBLIB->where("assetsAssignmentsStatus_deleted", 0);
 $PAGEDATA['USERDATA']['instance']['assetStatus'] = $DBLIB->get("assetsAssignmentsStatus");
 
+$PAGEDATA['projectsSidebarSorts'] = $bCMS->projectsSidebarSorts();
+
 
 echo $TWIG->render('instances/instances_settings.twig', $PAGEDATA);
 ?>
