@@ -11,7 +11,7 @@ final class InstanceProjectsSidebarSort extends AbstractMigration
      *
      * Lets a business choose the order of the project list in the sidebar. The default keeps
      * the order used before the setting existed (delivery start date, then name, then created).
-     * Valid values are the keys of bCMS::projectsSidebarSorts().
+     * Valid values are the keys of bCMS::projectsSorts() (named projectsSidebarSorts() when this migration was written).
      */
     public function change(): void
     {

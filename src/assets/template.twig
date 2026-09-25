@@ -227,7 +227,7 @@ ignoreURLs: ['searchUser.php'] // Ignore user searches
                         if (scroller) scroller.set(saved);
                     }
                     $(document).on("click", ".main-sidebar a[href]", save);
-                    $(window).on("pagehide beforeunload", save);
+                    $(window).on("pagehide", save);
                     $(window).on("load", function () { restore(false); }); // registered after adminlte.js, so its layout is set up first
                 })();
 

@@ -52,8 +52,8 @@
                         <div class="form-group">
                             <label>Project order</label>
                             <select class="form-control" name="instances_projectsSidebarSort">
-                                {% for key, sort in projectsSidebarSorts %}
-                                <option value="{{ key }}"{% if key == USERDATA.instance.instances_projectsSidebarSort or (loop.first and USERDATA.instance.instances_projectsSidebarSort not in projectsSidebarSorts|keys) %} selected{% endif %}>{{ sort.label }}{% if loop.first %} (default){% endif %}</option>
+                                {% for key, sort in PROJECTSSORT.options %}
+                                <option value="{{ key }}"{% if key == PROJECTSSORT.current %} selected{% endif %}>{{ sort.label }}{% if loop.first %} (default){% endif %}</option>
                                 {% endfor %}
                             </select>
                             <small class="form-text text-muted">How projects are ordered in the sidebar for everyone in this business. The Projects page starts in this order, and its sort menu can switch it for that view. Projects without a date are listed first when sorting by date.</small>

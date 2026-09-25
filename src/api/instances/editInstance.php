@@ -11,7 +11,7 @@ foreach ($_POST['formData'] as $item) {
 
 if (isset($array['instances_termsAndPayment'])) $array['instances_termsAndPayment'] = $bCMS->cleanString($array['instances_termsAndPayment']);
 if (isset($array['instances_quoteTerms'])) $array['instances_quoteTerms'] = $bCMS->cleanString($array['instances_quoteTerms']);
-if (array_key_exists('instances_projectsSidebarSort', $array) and !array_key_exists((string) $array['instances_projectsSidebarSort'], $bCMS->projectsSidebarSorts())) finish(false, ["code" => "INVALID-SORT", "message" => "Unknown project order"]);
+if (array_key_exists('instances_projectsSidebarSort', $array) and !(is_string($array['instances_projectsSidebarSort']) and array_key_exists($array['instances_projectsSidebarSort'], $bCMS->projectsSorts()))) finish(false, ["code" => "INVALID-SORT", "message" => "Unknown project order"]);
 
 $DBLIB->where("instances_id",$AUTH->data['instance']["instances_id"]);
 $result = $DBLIB->update("instances", array_intersect_key( $array, array_flip( ["instances_name","instances_address","instances_phone","instances_email","instances_website","instances_weekStartDates","instances_logo","instances_emailHeader","instances_termsAndPayment", "instances_quoteTerms", "instances_cableColours", "instances_projectsSidebarSort"] ) ));

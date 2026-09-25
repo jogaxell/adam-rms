@@ -472,26 +472,37 @@ class bCMS
     return true;
   }
   /**
-   * Add the business's chosen project order (instances_projectsSidebarSort) to the next $DBLIB query.
-   * Used by the sidebar and the project list. $sortKey overrides the business's choice (the Projects page's sort menu).
-   * Unknown or unset values fall back to the business's choice, then to the default.
+   * Resolve which project order to use: $requested if it is a known key (the Projects page's sort menu),
+   * otherwise the business's choice (instances_projectsSidebarSort), otherwise the default.
+   * Anything that is not a string, such as ?sort[]=x, counts as unknown.
+   *
+   * @return string a key of projectsSorts()
    */
-  function applyProjectsSort($instance, $sortKey = null)
+  function projectsSortKey($instance, $requested = null)
+  {
+    $sorts = $this->projectsSorts();
+    foreach ([$requested, $instance['instances_projectsSidebarSort'] ?? null] as $key) {
+      if (is_string($key) and isset($sorts[$key])) return $key;
+    }
+    return array_key_first($sorts);
+  }
+  /**
+   * Add a project order (a key from projectsSortKey()) to the next $DBLIB query.
+   */
+  function applyProjectsSort($sortKey)
   {
     global $DBLIB;
-    $sorts = $this->projectsSidebarSorts();
-    $sort = $sorts[(string) $sortKey] ?? $sorts[$instance['instances_projectsSidebarSort'] ?? ''] ?? reset($sorts);
-    foreach ($sort['orderBy'] as $order) {
+    foreach ($this->projectsSorts()[$sortKey]['orderBy'] as $order) {
       $DBLIB->orderBy($order[0], $order[1]);
     }
   }
   /**
-   * The orders a business can choose for the project list in the sidebar and on the Projects page (instances_projectsSidebarSort).
-   * The first entry is the default, and matches the order used before the setting existed.
+   * The project orders a business can choose for the sidebar, which is also the Projects page's starting order.
+   * The first entry is the default, and matches the sidebar order used before the setting existed.
    *
    * @return array key => ["label" => string, "orderBy" => [[column, direction], ...]]
    */
-  function projectsSidebarSorts()
+  function projectsSorts()
   {
     return [
       "deliverStart" => ["label" => "Delivery start date", "orderBy" => [["projects.projects_dates_deliver_start", "ASC"], ["projects.projects_name", "ASC"], ["projects.projects_created", "ASC"]]],

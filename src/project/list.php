@@ -35,11 +35,9 @@ if (isset($_GET['location'])) {
 
 
 //Sort menu - starts on the business's chosen order (Business Settings), ?sort= overrides it for this view
-$projectsSorts = $bCMS->projectsSidebarSorts();
-$businessSort = isset($projectsSorts[$AUTH->data['instance']['instances_projectsSidebarSort'] ?? '']) ? $AUTH->data['instance']['instances_projectsSidebarSort'] : array_key_first($projectsSorts);
-$sort = (isset($_GET['sort']) and isset($projectsSorts[$_GET['sort']])) ? $_GET['sort'] : $businessSort;
-$PAGEDATA['SORT'] = ["current" => $sort, "business" => $businessSort, "options" => []];
-foreach ($projectsSorts as $key => $option) {
+$sort = $bCMS->projectsSortKey($AUTH->data['instance'], $_GET['sort'] ?? null);
+$PAGEDATA['SORT'] = ["current" => $sort, "business" => $bCMS->projectsSortKey($AUTH->data['instance']), "options" => []];
+foreach ($bCMS->projectsSorts() as $key => $option) {
     $PAGEDATA['SORT']['options'][$key] = ["label" => $option['label'], "query" => http_build_query(array_merge($_GET, ["sort" => $key, "page" => 1]))];
 }
 
@@ -64,7 +62,7 @@ $DBLIB->join("projectsTypes", "projects.projectsTypes_id=projectsTypes.projectsT
 $DBLIB->join("projectsStatuses", "projects.projectsStatuses_id=projectsStatuses.projectsStatuses_id", "LEFT");
 
 $DBLIB->orderBy("projects.projects_archived", "ASC");
-$bCMS->applyProjectsSort($AUTH->data['instance'], $sort);
+$bCMS->applyProjectsSort($sort);
 $projectlist = $DBLIB->arraybuilder()->paginate("projects", $page, ["projects_id", "projectsTypes.*","projects_archived", "projects_name", "clients_name", "projects.clients_id", "projects_dates_deliver_start", "projects_dates_deliver_end","projects_dates_use_start", "projects_dates_use_end", "projects_manager", "users.users_name1", "users.users_name2", "users.users_email", "users.users_thumbnail", "projectsStatuses.projectsStatuses_name", "projectsStatuses.projectsStatuses_description"]);
 $PAGEDATA['pagination'] = ["page" => $page, "total" => $DBLIB->totalPages];
 $PAGEDATA['PROJECTSLIST'] = [];
@@ -80,7 +78,7 @@ foreach ($projectlist as $project) {
     $DBLIB->join("users", "projects.projects_manager=users.users_userid", "LEFT");
     $DBLIB->join("projectsTypes", "projects.projectsTypes_id=projectsTypes.projectsTypes_id", "LEFT");
     $DBLIB->join("projectsStatuses", "projects.projectsStatuses_id=projectsStatuses.projectsStatuses_id", "LEFT");
-    $bCMS->applyProjectsSort($AUTH->data['instance'], $sort);
+    $bCMS->applyProjectsSort($sort);
     $subProjects = $DBLIB->get("projects", null, ["projects_id", "projectsTypes.*","projects_archived", "projects_name", "clients_name", "projects.clients_id", "projects_dates_deliver_start", "projects_dates_deliver_end","projects_dates_use_start", "projects_dates_use_end", "projects_manager", "users.users_name1", "users.users_name2", "users.users_email", "users.users_thumbnail", "projectsStatuses.projectsStatuses_name", "projectsStatuses.projectsStatuses_description"]);
     $project['subProjects'] = [];
     foreach ($subProjects as $subProject) {
