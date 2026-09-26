@@ -18,30 +18,25 @@ $DBLIB->where("(assetCategoriesGroups.instances_id IS NULL OR assetCategoriesGro
 $DBLIB->join("assetCategoriesGroups", "assetCategoriesGroups.assetCategoriesGroups_id=assetCategories.assetCategoriesGroups_id", "LEFT");
 $PAGEDATA['categories'] = $DBLIB->get('assetCategories');
 
-//Storage locations, flattened into tree order with a tier for indenting and a full path so same-named sub-locations can be told apart
+//Storage locations, flattened into tree order with a tier for indenting sub-locations
 $PAGEDATA['locations'] = [];
 if ($AUTH->instancePermissionCheck("LOCATIONS:VIEW")) {
     $DBLIB->where("instances_id", $AUTH->data['instance']['instances_id']);
     $DBLIB->where("locations_deleted", 0);
     $DBLIB->where("locations_archived", 0);
     $DBLIB->orderBy("locations_name", "ASC");
-    $locations = $DBLIB->get("locations", null, ["locations_id", "locations_name", "locations_subOf"]);
-    $locationIds = array_flip(array_column($locations, "locations_id"));
     $locationsBySubOf = [];
-    foreach ($locations as $location) {
-        //A location whose parent is archived or deleted is listed at the top level rather than hidden
-        $subOf = ($location['locations_subOf'] !== null and isset($locationIds[$location['locations_subOf']])) ? $location['locations_subOf'] : 0;
-        $locationsBySubOf[$subOf][] = $location;
+    foreach ($DBLIB->get("locations", null, ["locations_id", "locations_name", "locations_subOf"]) as $location) {
+        $locationsBySubOf[$location['locations_subOf'] ?? 0][] = $location;
     }
-    $addLocations = function ($subOf, $tier, $parentPath) use (&$addLocations, &$locationsBySubOf, &$PAGEDATA) {
+    $addLocations = function ($subOf, $tier) use (&$addLocations, &$locationsBySubOf, &$PAGEDATA) {
         foreach ($locationsBySubOf[$subOf] ?? [] as $location) {
             $location['tier'] = $tier;
-            $location['path'] = $parentPath === null ? $location['locations_name'] : $parentPath . " › " . $location['locations_name'];
             $PAGEDATA['locations'][] = $location;
-            $addLocations($location['locations_id'], $tier + 1, $location['path']);
+            $addLocations($location['locations_id'], $tier + 1);
         }
     };
-    $addLocations(0, 0, null);
+    $addLocations(0, 0);
 }
 
 $DBLIB->where("instances_id", $AUTH->data['instance']['instances_id']);

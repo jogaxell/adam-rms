@@ -184,7 +184,7 @@
                     <select class="form-control" id="storageLocation" name="assets_storageLocation">
                         <option value="">No location selected</option>
                         {% for location in locations %}
-                            <option value="{{ location.locations_id }}" data-tier="{{ location.tier }}">{{ location.path }}</option>
+                            <option value="{{ location.locations_id }}" data-tier="{{ location.tier }}">{{ location.locations_name }}</option>
                         {% endfor %}
                     </select>
                 </div>
