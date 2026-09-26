@@ -25,6 +25,7 @@ if (isset($array['assets_tag']) and $array['assets_tag'] != null) {
 } else $array['assets_tag'] = generateNewTag();
 
 if (isset($array['assets_storageLocation']) and $array['assets_storageLocation'] != null) {
+    $array['assets_storageLocation'] = (int) $array['assets_storageLocation'];
     $DBLIB->where("locations.instances_id", $AUTH->data['instance']['instances_id']);
     $DBLIB->where("locations.locations_id", $array['assets_storageLocation']);
     $DBLIB->where("locations.locations_deleted", 0);
