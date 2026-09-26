@@ -18,6 +18,27 @@ $DBLIB->where("(assetCategoriesGroups.instances_id IS NULL OR assetCategoriesGro
 $DBLIB->join("assetCategoriesGroups", "assetCategoriesGroups.assetCategoriesGroups_id=assetCategories.assetCategoriesGroups_id", "LEFT");
 $PAGEDATA['categories'] = $DBLIB->get('assetCategories');
 
+//Storage locations, flattened into tree order with a tier for indenting sub-locations
+$PAGEDATA['locations'] = [];
+if ($AUTH->instancePermissionCheck("LOCATIONS:VIEW")) {
+    $DBLIB->where("instances_id", $AUTH->data['instance']['instances_id']);
+    $DBLIB->where("locations_deleted", 0);
+    $DBLIB->where("locations_archived", 0);
+    $DBLIB->orderBy("locations_name", "ASC");
+    $locationsBySubOf = [];
+    foreach ($DBLIB->get("locations", null, ["locations_id", "locations_name", "locations_subOf"]) as $location) {
+        $locationsBySubOf[$location['locations_subOf'] ?? 0][] = $location;
+    }
+    $addLocations = function ($subOf, $tier) use (&$addLocations, &$locationsBySubOf, &$PAGEDATA) {
+        foreach ($locationsBySubOf[$subOf] ?? [] as $location) {
+            $location['tier'] = $tier;
+            $PAGEDATA['locations'][] = $location;
+            $addLocations($location['locations_id'], $tier + 1);
+        }
+    };
+    $addLocations(0, 0);
+}
+
 $DBLIB->where("instances_id", $AUTH->data['instance']['instances_id']);
 $assetCapacity = $DBLIB->getvalue("instances", "instances_assetLimit");
 $DBLIB->where("instances_id", $AUTH->data['instance']['instances_id']);

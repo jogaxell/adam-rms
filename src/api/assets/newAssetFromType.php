@@ -24,7 +24,15 @@ if (isset($array['assets_tag']) and $array['assets_tag'] != null) {
     if ($duplicateAssetTag > 0) finish(false, ["code" => "INSERT-FAIL", "message" => "Sorry that tag you chose was a duplicate - please choose another one"]);
 } else $array['assets_tag'] = generateNewTag();
 
-$result = $DBLIB->insert("assets", array_intersect_key($array, array_flip(['assets_tag', 'assetTypes_id', 'assets_notes', 'instances_id', 'asset_definableFields_1', 'asset_definableFields_2', 'asset_definableFields_3', 'asset_definableFields_4', 'asset_definableFields_5', 'asset_definableFields_6', 'asset_definableFields_7', 'asset_definableFields_8', 'asset_definableFields_9', 'asset_definableFields_10', 'assets_assetGroups'])));
+if (isset($array['assets_storageLocation']) and $array['assets_storageLocation'] != null) {
+    $DBLIB->where("locations.instances_id", $AUTH->data['instance']['instances_id']);
+    $DBLIB->where("locations.locations_id", $array['assets_storageLocation']);
+    $DBLIB->where("locations.locations_deleted", 0);
+    $DBLIB->where("locations.locations_archived", 0);
+    if (!$DBLIB->getValue("locations", "count(*)")) finish(false, ["code" => "PARAM-ERROR", "message" => "Could not find that storage location"]);
+} else unset($array['assets_storageLocation']);
+
+$result = $DBLIB->insert("assets", array_intersect_key($array, array_flip(['assets_tag', 'assetTypes_id', 'assets_notes', 'assets_storageLocation', 'instances_id', 'asset_definableFields_1', 'asset_definableFields_2', 'asset_definableFields_3', 'asset_definableFields_4', 'asset_definableFields_5', 'asset_definableFields_6', 'asset_definableFields_7', 'asset_definableFields_8', 'asset_definableFields_9', 'asset_definableFields_10', 'assets_assetGroups'])));
 
 if (!$result) finish(false, ["code" => "INSERT-FAIL", "message" => "Could not insert asset"]);
 
@@ -141,7 +149,12 @@ Requires Instance Permission 17 ASSETS:CREATE
  *                 description="undefined",
  *             ),
  *             @OA\Property(
- *                 property="assets_assetGroups", 
+ *                 property="assets_storageLocation",
+ *                 type="integer",
+ *                 description="The ID of the location the asset is stored at (optional)",
+ *             ),
+ *             @OA\Property(
+ *                 property="assets_assetGroups",
  *                 type="string", 
  *                 description="undefined",
  *             ),
