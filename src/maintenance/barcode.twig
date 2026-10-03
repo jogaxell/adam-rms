@@ -1,50 +1,118 @@
 {% extends "assets/template.twig" %}
+{% block htmlIncludes %}
+    <style>
+        /* Barcode Lookup: compact for handheld scanners - the scan bar stays in view while the result scrolls */
+        #content-wrapper > .content-header {
+            padding: .25rem 0 0;
+        }
+        #content-wrapper > .content > .container-fluid {
+            padding-left: .5rem;
+            padding-right: .5rem;
+        }
+        .barcode-lookup {
+            max-width: 720px;
+            margin: 0 auto;
+        }
+        .barcode-lookup-bar {
+            position: sticky;
+            top: calc(3.5rem + 1px);
+            z-index: 1000;
+            background-color: #f4f6f9;
+            padding: .25rem 0 .4rem;
+        }
+        .dark-mode .barcode-lookup-bar {
+            background-color: #454d55;
+        }
+        .barcode-lookup-history {
+            display: flex;
+            gap: .25rem;
+            overflow-x: auto;
+            white-space: nowrap;
+            margin-top: .35rem;
+            scrollbar-width: none;
+        }
+        .barcode-lookup-history:empty {
+            display: none;
+        }
+        .barcode-lookup-history .btn {
+            flex: 0 0 auto;
+            max-width: 9rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        #barcodeLookupResult.barcode-lookup-loading {
+            opacity: .5;
+        }
+        .barcode-lookup-card .card-body {
+            padding: .6rem;
+        }
+        .barcode-lookup-card .lookup-title {
+            font-size: 1.1rem;
+            line-height: 1.25;
+            overflow-wrap: anywhere;
+        }
+        .barcode-lookup-card .lookup-section {
+            border-top: 1px solid rgba(128, 128, 128, .25);
+            padding-top: .4rem;
+            margin-top: .4rem;
+        }
+        .barcode-lookup-card details.lookup-section > summary,
+        .barcode-lookup-card .lookup-section-title {
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: .25rem;
+        }
+        .barcode-lookup-card .lookup-section-title {
+            cursor: default;
+        }
+        .barcode-lookup-card .lookup-row {
+            display: flex;
+            gap: .4rem;
+            line-height: 1.3;
+            margin-bottom: .3rem;
+            overflow-wrap: anywhere;
+        }
+        .barcode-lookup-card .lookup-row > i {
+            flex: 0 0 1.1rem;
+            margin-top: .15rem;
+            opacity: .7;
+        }
+        .barcode-lookup-card .lookup-notes {
+            white-space: pre-line;
+        }
+        .barcode-lookup-card .list-group-item {
+            padding: .4rem .5rem;
+        }
+        .barcode-lookup-card .alert {
+            padding: .3rem .5rem;
+            margin-bottom: .35rem;
+            font-size: .875rem;
+        }
+    </style>
+{% endblock %}
 {% block content %}
-    <div class="row">
-        <div class="col-12">
-            <div class="float-right mb-2">
-                <a class="btn btn-sm btn-info" href="{{ CONFIG.ROOTURL }}/maintenance/barcodeGenerator.php">Generate/Export Barcodes</a>
+    <div class="barcode-lookup">
+        <div class="barcode-lookup-bar">
+            <div class="d-flex align-items-center mb-1">
+                <h1 class="h5 mb-0 flex-grow-1"><i class="fas fa-barcode mr-1"></i> Barcode Lookup</h1>
+                <div class="dropdown">
+                    <button type="button" class="btn btn-sm btn-tool" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="More">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-right">
+                        <a class="dropdown-item" href="{{ CONFIG.ROOTURL }}/maintenance/barcodeGenerator.php"><i class="fas fa-print mr-1"></i> Generate/Export Barcodes</a>
+                    </div>
+                </div>
             </div>
+            {% embed 'assets/widgets/barcodeScanner.twig' with {"scannerCallback": "barcodeLookupScanned", "scannerIdSuffix": ""} %}
+            {% endembed %}
+            <div class="barcode-lookup-history" id="barcodeLookupHistory" aria-label="Recent lookups"></div>
         </div>
-    </div>
-    {% embed 'assets/widgets/barcodeScanner.twig' with {"scannerCallback": "mainBarcodeScanned", "scannerIdSuffix": ""} %}
-    {% endembed %}
-    <div class="row">
-        <div class="col-12 col-md-6">
-            <div class="card" id="currentLocationCard">
-                <div class="card-header">
-                    <h3 class="card-title" id="currentLocationText"></h3>
-                    <div class="card-tools">
-                        <button class="btn btn-tool btn-default" title="Change Location Set" id="changeLocationButton">Change location</button>
-                    </div>
-                </div>
-            </div>
-            <div class="card" id="setLocationCard">
-                <div class="card-header">
-                    <h3 class="card-title">Set Location to begin scanning</h3>
-                </div>
-                <div class="card-body">
-                    <p>Set your location by:</p>
-                    <ul>
-                        <li>Scanning a location barcode</li>
-                        <li>Scanning an asset barcode (to set that asset as your location)</li>
-                        <li>Manually entering a location below</li>
-                    </ul>
-                    <div class="input-group">
-                        <input type="text" class="form-control" id="customLocationText" placeholder="Enter Location">
-                        <div class="input-group-append">
-                            <button class="btn btn-default" id="setCustomLocationButton">Set Location</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">Assets Scanned</h3>
-                </div>
-                <div class="card-body">
-                    <div class="row d-flex align-items-stretch" id="assetsScannedList"></div>
-                </div>
+        <div id="barcodeLookupResult" aria-live="polite">
+            <div class="text-center text-muted py-4 px-2">
+                <i class="fas fa-search fa-2x mb-2"></i>
+                <p class="mb-1">Scan an asset or location barcode to see what it is, where it is and which project it's on.</p>
+                <p class="small mb-0">This is a lookup only - nothing is recorded. To move assets, use Barcode Dispatch on a project.</p>
             </div>
         </div>
     </div>
@@ -52,269 +120,381 @@
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h4 class="modal-title">Associate Barcode with Asset</h4>
+                    <h4 class="modal-title">Assign barcode to an asset</h4>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
                 <div class="modal-body">
-                    <select class="form-control" multiple="multiple" id="selectAnAssetToAssign-assets" placeholder="Enter asset tags here"></select>
+                    <p class="small text-muted" id="selectAnAssetToAssign-text"></p>
+                    <select class="form-control" id="selectAnAssetToAssign-assets"></select>
                     <input type="hidden" id="selectAnAssetToAssign-barcode" value="">
                     <input type="hidden" id="selectAnAssetToAssign-barcodetype" value="">
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-primary" id="selectAnAssetToAssign-button">Associate</button>
+                    <button type="button" class="btn btn-primary" id="selectAnAssetToAssign-button">Assign</button>
                 </div>
             </div>
         </div>
     </div>
     <script>
-        var barcodeScanLocation = {
-            value: null,
-            name: null,
-            type: false
+        var barcodeLookupPermissions = {
+            associate: {{ "ASSETS:ASSET_BARCODES:EDIT:ASSOCIATE_UNNASOCIATED_BARCODES_WITH_ASSETS"|instancePermissions ? 'true' : 'false' }},
+            deleteBarcode: {{ "ASSETS:ASSET_BARCODES:DELETE"|instancePermissions ? 'true' : 'false' }},
+            editAsset: {{ "ASSETS:EDIT"|instancePermissions ? 'true' : 'false' }},
+            maintenance: {{ "MAINTENANCE_JOBS:VIEW"|instancePermissions ? 'true' : 'false' }},
+            locations: {{ "LOCATIONS:VIEW"|instancePermissions ? 'true' : 'false' }}
+        };
+        var barcodeLookupHistory = [];
+
+        // --- Small DOM helpers: all data is inserted as text, never as HTML ---
+        function lookupEl(tag, cls, text) {
+            var element = $("<" + tag + ">");
+            if (cls) element.addClass(cls);
+            if (text !== undefined && text !== null) element.text(text);
+            return element;
         }
-        var barcodeRequestInProgress = false
-        function mainBarcodeScanned(value, type) {
-            if (barcodeRequestInProgress) {
-                console.log("Request already in progress")
-                return
+        function lookupText(text) {
+            return document.createTextNode(text === null || text === undefined ? "" : String(text));
+        }
+        function lookupRow(iconClass, content) {
+            return lookupEl("div", "lookup-row").append($("<i>").addClass("fas fa-fw " + iconClass), $("<div>").append(content));
+        }
+        function lookupDate(timestamp, withTime) {
+            if (!timestamp) return "";
+            var date = new Date(String(timestamp).replace(" ", "T"));
+            if (isNaN(date.getTime())) return timestamp;
+            var options = {day: "2-digit", month: "short"};
+            if (date.getFullYear() !== new Date().getFullYear()) options.year = "numeric";
+            if (withTime) {
+                options.hour = "2-digit";
+                options.minute = "2-digit";
             }
-            if (barcodeScanLocation.type === false) {
-                scanParseLocation(value, type)
+            return date.toLocaleString("en-GB", options);
+        }
+        function lookupVibrate(ok) {
+            if (!navigator.vibrate) return;
+            try {
+                navigator.vibrate(ok ? 40 : [80, 60, 80]);
+            } catch (e) {}
+        }
+
+        // --- Rendering ---
+        function renderLookupAsset(entry) {
+            var asset = entry.response.asset;
+            var card = lookupEl("div", "card card-outline card-primary barcode-lookup-card mb-2");
+            var body = lookupEl("div", "card-body").appendTo(card);
+
+            var header = lookupEl("div", "d-flex align-items-start").appendTo(body);
+            var titleBox = lookupEl("div", "flex-grow-1").css("min-width", 0).appendTo(header);
+            lookupEl("div", "lookup-title").append(lookupEl("strong", null, aTag(asset.assets_tag)), lookupText(" " + asset.assetTypes_name)).appendTo(titleBox);
+            var category = [asset.assetCategoriesGroups_name, asset.assetCategories_name].filter(Boolean).join(" › ");
+            var subtitle = [asset.manufacturers_name ? asset.manufacturers_name.trim() : null, category].filter(Boolean).join(" · ");
+            lookupEl("div", "small text-muted text-truncate", subtitle).attr("title", subtitle).appendTo(titleBox);
+            if (asset.archived) lookupEl("span", "badge badge-secondary", "Archived").appendTo(titleBox);
+            $("<a>").addClass("btn btn-sm btn-primary ml-2 text-nowrap").attr("href", asset.url).append($("<i>").addClass("fas fa-external-link-alt mr-1"), lookupText("Open")).appendTo(header);
+
+            // Blocks and flags first - they decide whether the asset may be used at all
+            var jobLink = function (job) {
+                if (!barcodeLookupPermissions.maintenance) return lookupText(job.title);
+                return $("<a>").addClass("alert-link").attr("href", "{{ CONFIG.ROOTURL }}/maintenance/job.php?id=" + encodeURIComponent(job.maintenanceJobs_id)).text(job.title);
+            };
+            if (asset.blocks.length || asset.flags.length) body.append(lookupEl("div", "mt-2"));
+            asset.blocks.forEach(function (job) {
+                lookupEl("div", "alert alert-danger").append($("<i>").addClass("fas fa-ban mr-1"), lookupEl("strong", null, "Blocked: "), jobLink(job)).appendTo(body);
+            });
+            asset.flags.forEach(function (job) {
+                lookupEl("div", "alert alert-warning").append($("<i>").addClass("fas fa-flag mr-1"), lookupEl("strong", null, "Flagged: "), jobLink(job)).appendTo(body);
+            });
+
+            if (entry.response.matchedBy === "tag" && entry.scan) {
+                var tagNote = lookupEl("div", "alert alert-info mt-2").append(lookupText("Found by its asset tag - this barcode isn't registered to the asset yet."));
+                if (barcodeLookupPermissions.associate) {
+                    $("<button>").attr("type", "button").addClass("btn btn-sm btn-light ml-1 mt-1 lookup-register-barcode").text("Register barcode").appendTo(tagNote);
+                }
+                tagNote.appendTo(body);
+            }
+
+            // Where it is now, and where it belongs
+            var locationSection = lookupEl("div", "lookup-section").appendTo(body);
+            if (asset.lastScan) {
+                var meta = [asset.lastScan.user, lookupDate(asset.lastScan.timestamp, true), asset.lastScan.note].filter(Boolean).join(" · ");
+                locationSection.append(lookupRow("fa-map-marker-alt", [lookupEl("span", "text-muted", "Now: "), lookupEl("strong", null, asset.lastScan.location || "Unknown"), lookupEl("div", "small text-muted", meta)]));
             } else {
-                scanParseAsset(value, type)
+                locationSection.append(lookupRow("fa-map-marker-alt", [lookupEl("span", "text-muted", "Now: "), lookupEl("em", "text-muted", "No scan recorded")]));
             }
-        }
-        function scanParseLocation(barcodeValue, barcodeType) {
-            barcodeRequestInProgress = true
-            ajaxcall("assets/barcodes/search.php", {
-                "text": barcodeValue,
-                "type": barcodeType,
-                "scanned": true,
-            }, function (data) {
-                if (data.response.location) {
-                    setScanLocation(data.response.location["locationsBarcodes_id"], data.response.location['locations_name'], "barcode")
-                    bootbox.alert("Location set to " + data.response.location['locations_name'], function () {
-                        barcodeRequestInProgress = false
-                    });
-                } else if (data.response.asset) {
-                    setScanLocation(data.response.asset['assets_id'], data.response.asset['assets_tag'] + " " + data.response.asset['assetTypes_name'], "asset")
-                    bootbox.alert("Location set to asset " + data.response.asset['assets_tag'] + " " + data.response.asset['assetTypes_name'], function () {
-                        barcodeRequestInProgress = false
+            locationSection.append(lookupRow("fa-warehouse", [lookupEl("span", "text-muted", "Storage: "), asset.storageLocation.length ? lookupText(asset.storageLocation.join(" › ")) : lookupEl("em", "text-muted", "None")]));
+
+            if (asset.projects !== undefined) {
+                var projectSection = lookupEl("div", "lookup-section").appendTo(body);
+                lookupEl("div", "lookup-section-title", "Projects").appendTo(projectSection);
+                if (!asset.projects.length) lookupEl("div", "small text-muted", "Not on any project.").appendTo(projectSection);
+                asset.projects.forEach(function (project) {
+                    var badge = lookupEl("span", "badge ml-1", project.projectsStatuses_name);
+                    if (project.projectsStatuses_backgroundColour) badge.css({"background-color": project.projectsStatuses_backgroundColour, "color": project.projectsStatuses_foregroundColour || "#000"});
+                    var details = [
+                        "Dispatch: " + (project.assetsAssignmentsStatus_name || "not started"),
+                        lookupDate(project.projects_dates_deliver_start) + " - " + lookupDate(project.projects_dates_deliver_end) + (project.ended ? " (ended)" : "")
+                    ].join(" · ");
+                    projectSection.append(lookupRow(project.ended ? "fa-history" : "fa-folder-open", [
+                        $("<a>").attr("href", "{{ CONFIG.ROOTURL }}/project/?id=" + encodeURIComponent(project.projects_id)).append(lookupEl("strong", null, project.projects_name)),
+                        project.projectsStatuses_name ? badge : null,
+                        lookupEl("div", "small " + (project.ended ? "text-muted" : ""), details)
+                    ]));
+                });
+            }
+
+            if (asset.maintenance !== undefined) {
+                if (asset.maintenance.length) {
+                    var maintenanceSection = $("<details>").addClass("lookup-section").appendTo(body);
+                    $("<summary>").text("Maintenance (" + asset.maintenance.length + " open)").appendTo(maintenanceSection);
+                    asset.maintenance.forEach(function (job) {
+                        var meta = [job.maintenanceJobsStatuses_name, job.maintenanceJobs_timestamp_due ? "due " + lookupDate(job.maintenanceJobs_timestamp_due) : null].filter(Boolean).join(" · ");
+                        maintenanceSection.append(lookupRow("fa-wrench", [jobLink({maintenanceJobs_id: job.maintenanceJobs_id, title: job.maintenanceJobs_title}), lookupEl("div", "small text-muted", meta)]));
                     });
                 } else {
-                    bootbox.alert("Sorry location not found");
-                    barcodeRequestInProgress = false
+                    lookupEl("div", "lookup-section small text-muted").append($("<i>").addClass("fas fa-wrench fa-fw mr-1"), lookupText("No open maintenance jobs")).appendTo(body);
+                }
+            }
+
+            var notes = (asset.assets_notes || "").trim();
+            if (notes.length || asset.fields.length) {
+                var notesSection = $("<details>").addClass("lookup-section").appendTo(body);
+                if (notes.length <= 200 && asset.fields.length <= 4) notesSection.attr("open", true);
+                $("<summary>").text("Notes & fields").appendTo(notesSection);
+                if (notes.length) lookupEl("div", "lookup-notes mb-1", notes).appendTo(notesSection);
+                asset.fields.forEach(function (field) {
+                    notesSection.append(lookupEl("div", "small").append(lookupEl("span", "text-muted", field.name + ": "), lookupText(field.value)));
+                });
+            }
+
+            if (entry.response.barcode && barcodeLookupPermissions.deleteBarcode) {
+                var actions = lookupEl("div", "lookup-section text-right").appendTo(body);
+                $("<button>").attr("type", "button").addClass("btn btn-xs btn-outline-danger lookup-delete-barcode").append($("<i>").addClass("fas fa-trash-alt mr-1"), lookupText("Delete this barcode")).appendTo(actions);
+            }
+            return card;
+        }
+        function renderLookupAssetList(assets) {
+            var list = lookupEl("div", "list-group list-group-flush");
+            assets.forEach(function (asset) {
+                $("<button>").attr({"type": "button", "data-asset-id": asset.assets_id}).addClass("list-group-item list-group-item-action")
+                    .append(lookupEl("strong", null, aTag(asset.assets_tag)), lookupText(" " + asset.assetTypes_name)).appendTo(list);
+            });
+            return list;
+        }
+        function renderLookupLocation(entry) {
+            var location = entry.response.location;
+            var card = lookupEl("div", "card card-outline card-info barcode-lookup-card mb-2");
+            var body = lookupEl("div", "card-body").appendTo(card);
+
+            var header = lookupEl("div", "d-flex align-items-start").appendTo(body);
+            var titleBox = lookupEl("div", "flex-grow-1").css("min-width", 0).appendTo(header);
+            lookupEl("div", "lookup-title").append($("<i>").addClass("fas fa-map-marker-alt mr-1 text-info"), lookupEl("strong", null, location.path.length ? location.path.join(" › ") : location.locations_name)).appendTo(titleBox);
+            lookupEl("div", "small text-muted", ["Location", location.clients_name].filter(Boolean).join(" · ")).appendTo(titleBox);
+            if (location.locations_archived == 1) lookupEl("span", "badge badge-secondary", "Archived").appendTo(titleBox);
+            if (barcodeLookupPermissions.locations) {
+                $("<a>").addClass("btn btn-sm btn-outline-info ml-2 text-nowrap").attr("href", "{{ CONFIG.ROOTURL }}/location/?q=" + encodeURIComponent(location.locations_name)).append($("<i>").addClass("fas fa-external-link-alt mr-1"), lookupText("Open")).appendTo(header);
+            }
+
+            var hereNow = $("<details>").addClass("lookup-section").attr("open", true).appendTo(body);
+            $("<summary>").text("Here now (" + location.hereNow.length + (location.hereNowMore ? "+" : "") + ")").appendTo(hereNow);
+            if (location.hereNow.length) hereNow.append(renderLookupAssetList(location.hereNow));
+            else lookupEl("div", "small text-muted", "No asset was last scanned here.").appendTo(hereNow);
+            if (location.hereNowMore) lookupEl("div", "small text-muted mt-1", "Only the first " + location.hereNow.length + " are shown.").appendTo(hereNow);
+
+            var storedHere = $("<details>").addClass("lookup-section").appendTo(body);
+            if (!location.hereNow.length) storedHere.attr("open", true);
+            $("<summary>").text("Stored here (" + location.storedHere.length + (location.storedHereMore ? "+" : "") + ")").appendTo(storedHere);
+            if (location.storedHere.length) storedHere.append(renderLookupAssetList(location.storedHere));
+            else lookupEl("div", "small text-muted", "No asset has this as its storage location.").appendTo(storedHere);
+            if (location.storedHereMore) lookupEl("div", "small text-muted mt-1", "Only the first " + location.storedHere.length + " are shown.").appendTo(storedHere);
+
+            if (location.subLocations.length) {
+                var subLocations = $("<details>").addClass("lookup-section").appendTo(body);
+                $("<summary>").text("Sub-locations (" + location.subLocations.length + ")").appendTo(subLocations);
+                var list = lookupEl("div", "list-group list-group-flush").appendTo(subLocations);
+                location.subLocations.forEach(function (subLocation) {
+                    $("<button>").attr({"type": "button", "data-location-id": subLocation.locations_id}).addClass("list-group-item list-group-item-action")
+                        .append($("<i>").addClass("fas fa-map-marker-alt fa-fw mr-1 text-info"), lookupText(subLocation.locations_name + (subLocation.locations_archived == 1 ? " (archived)" : ""))).appendTo(list);
+                });
+            }
+            return card;
+        }
+        function renderLookupNotFound(entry) {
+            var card = lookupEl("div", "card card-outline card-danger barcode-lookup-card mb-2");
+            var body = lookupEl("div", "card-body").appendTo(card);
+            lookupEl("div", "lookup-title").append($("<i>").addClass("fas fa-times-circle mr-1 text-danger"), lookupEl("strong", null, "Not found")).appendTo(body);
+            lookupEl("p", "mb-2").append(lookupText("No asset or location has the barcode "), lookupEl("strong", null, entry.scan.value), lookupText(".")).appendTo(body);
+            if (barcodeLookupPermissions.associate) {
+                $("<button>").attr("type", "button").addClass("btn btn-sm btn-primary lookup-assign-barcode").append($("<i>").addClass("fas fa-link mr-1"), lookupText("Assign to an asset")).appendTo(body);
+            } else {
+                lookupEl("p", "small text-muted mb-0", "You don't have permission to assign barcodes to assets.").appendTo(body);
+            }
+            return card;
+        }
+        function renderLookupError(title, message) {
+            var card = lookupEl("div", "card card-outline card-danger barcode-lookup-card mb-2");
+            var body = lookupEl("div", "card-body").appendTo(card);
+            lookupEl("div", "lookup-title").append($("<i>").addClass("fas fa-exclamation-triangle mr-1 text-danger"), lookupEl("strong", null, title)).appendTo(body);
+            lookupEl("p", "mb-0", message).appendTo(body);
+            $("#barcodeLookupResult").empty().append(card);
+            lookupVibrate(false);
+        }
+        var barcodeLookupCurrent = null;
+        function renderLookup(entry) {
+            barcodeLookupCurrent = entry;
+            var card;
+            if (entry.response.kind === "asset") card = renderLookupAsset(entry);
+            else if (entry.response.kind === "location") card = renderLookupLocation(entry);
+            else card = renderLookupNotFound(entry);
+            $("#barcodeLookupResult").empty().append(card);
+            renderLookupHistory();
+            window.scrollTo(0, 0);
+        }
+
+        // --- History of the last lookups, tappable to show them again without scanning ---
+        function lookupEntryLabel(entry) {
+            if (entry.response.kind === "asset") return aTag(entry.response.asset.assets_tag);
+            if (entry.response.kind === "location") return entry.response.location.locations_name;
+            return entry.scan ? entry.scan.value : "?";
+        }
+        function lookupEntryKey(entry) {
+            if (entry.response.kind === "asset") return "a" + entry.response.asset.assets_id;
+            if (entry.response.kind === "location") return "l" + entry.response.location.locations_id;
+            return "n" + (entry.scan ? entry.scan.value : "");
+        }
+        function addLookupHistory(entry) {
+            var key = lookupEntryKey(entry);
+            barcodeLookupHistory = barcodeLookupHistory.filter(function (other) { return lookupEntryKey(other) !== key; });
+            barcodeLookupHistory.unshift(entry);
+            barcodeLookupHistory = barcodeLookupHistory.slice(0, 10);
+        }
+        function renderLookupHistory() {
+            var history = $("#barcodeLookupHistory").empty();
+            if (barcodeLookupHistory.length < 2) return;
+            barcodeLookupHistory.forEach(function (entry, index) {
+                var icon = entry.response.kind === "asset" ? "fa-cube" : (entry.response.kind === "location" ? "fa-map-marker-alt" : "fa-times");
+                $("<button>").attr({"type": "button", "data-history": index, "title": lookupEntryLabel(entry)})
+                    .addClass("btn btn-xs " + (entry === barcodeLookupCurrent ? "btn-secondary" : "btn-outline-secondary"))
+                    .append($("<i>").addClass("fas mr-1 " + icon), lookupText(lookupEntryLabel(entry))).appendTo(history);
+            });
+        }
+
+        // --- Looking things up ---
+        function barcodeLookupRequest(data, scan, done) {
+            $("#barcodeLookupResult").addClass("barcode-lookup-loading");
+            $.ajax({
+                url: "{{ CONFIG.ROOTURL }}/api/assets/barcodes/lookup.php",
+                type: "POST",
+                data: data,
+                cache: false,
+                timeout: 20000
+            }).done(function (result) {
+                if (!result || !result.result) {
+                    renderLookupError(scan ? scan.value : "Lookup failed", (result && result.error && result.error.message) || "Sorry - that could not be looked up.");
+                    return;
+                }
+                var entry = {response: result.response, scan: scan};
+                addLookupHistory(entry);
+                renderLookup(entry);
+                lookupVibrate(result.response.kind !== "none");
+            }).fail(function () {
+                renderLookupError(scan ? scan.value : "Connection problem", "No connection to the server - please scan again.");
+            }).always(function () {
+                $("#barcodeLookupResult").removeClass("barcode-lookup-loading");
+                if (done) done();
+            });
+        }
+        // Called by the barcode scanner widget, one scan at a time
+        function barcodeLookupScanned(value, type, done) {
+            barcodeLookupRequest({text: value, type: type}, {value: value, type: type}, done);
+        }
+        function repeatLookup(entry) {
+            if (entry.scan) barcodeLookupRequest({text: entry.scan.value, type: entry.scan.type}, entry.scan);
+            else if (entry.response.kind === "asset") barcodeLookupRequest({assets_id: entry.response.asset.assets_id}, null);
+            else if (entry.response.kind === "location") barcodeLookupRequest({locations_id: entry.response.location.locations_id}, null);
+        }
+
+        // --- Assigning an unknown barcode to an asset ---
+        function assignedBarcodeToAsset(assetsId, barcode, barcodeType) {
+            var lookupAgain = function () { barcodeLookupRequest({text: barcode, type: barcodeType}, {value: barcode, type: barcodeType}); };
+            if (!barcodeLookupPermissions.editAsset) return lookupAgain();
+            bootbox.confirm({
+                title: "Change asset tag?",
+                message: $("<div>").append(lookupText("Would you also like to change the asset's tag to "), lookupEl("strong", null, barcode), lookupText("?")).html(),
+                buttons: {
+                    confirm: {label: "Yes, change tag", className: "btn-primary"},
+                    cancel: {label: "No", className: "btn-default"}
+                },
+                callback: function (result) {
+                    if (result) ajaxcall("assets/editAsset.php", {"assets_id": assetsId, "assets_tag": barcode}, lookupAgain);
+                    else lookupAgain();
                 }
             });
         }
-        function scanParseAsset(barcodeValue, barcodeType) {
-            barcodeRequestInProgress = true
-            ajaxcall("assets/barcodes/search.php", {"text":barcodeValue,"type":barcodeType,"location":barcodeScanLocation.value,"locationType":barcodeScanLocation.type,"scanned": true}, function (assetResult) {
-                if (assetResult.response.asset === false && assetResult.response.location !== false) {
-                    bootbox.confirm({
-                        title: "Location Barcode Scanned",
-                        message: 'Would you like to change your location to ' + assetResult.response.location['locations_name'] + '?',
-                        buttons: {
-                            confirm: {
-                                label: 'Yes',
-                                className: 'btn-danger'
-                            },
-                            cancel: {
-                                label: 'No',
-                                className: 'btn-default'
-                            }
-                        
+
+        $(document).ready(function () {
+            // The page used to remember a scan location - it no longer records anything
+            try {
+                ["value", "name", "type"].forEach(function (key) { localStorage.removeItem("adamrms-barcode-scan-location-" + key); });
+            } catch (e) {}
+
+            $("#barcodeLookupHistory").on("click", "[data-history]", function () {
+                var entry = barcodeLookupHistory[$(this).data("history")];
+                if (entry) renderLookup(entry);
+            });
+            $("#barcodeLookupResult").on("click", "[data-asset-id]", function () {
+                barcodeLookupRequest({assets_id: $(this).data("asset-id")}, null);
+            });
+            $("#barcodeLookupResult").on("click", "[data-location-id]", function () {
+                barcodeLookupRequest({locations_id: $(this).data("location-id")}, null);
+            });
+            $("#barcodeLookupResult").on("click", ".lookup-register-barcode", function () {
+                var entry = barcodeLookupCurrent;
+                ajaxcall("assets/barcodes/assign.php", {"id": entry.response.asset.assets_id, "text": entry.scan.value, "type": entry.scan.type}, function () {
+                    repeatLookup(entry);
+                });
+            });
+            $("#barcodeLookupResult").on("click", ".lookup-delete-barcode", function () {
+                var entry = barcodeLookupCurrent;
+                bootbox.confirm({
+                    title: "Delete barcode",
+                    message: "Are you sure you want to delete this barcode? All scan history for this barcode will be lost.",
+                    buttons: {
+                        confirm: {label: "Delete", className: "btn-danger"},
+                        cancel: {label: "Cancel", className: "btn-default"}
                     },
                     callback: function (result) {
-                        if (result) {
-                            setScanLocation(assetResult.response.location['barcode']["locationsBarcodes_id"], assetResult.response.location['locations_name'], "barcode")
-                            bootbox.alert("Location set to " + assetResult.response.location['locations_name']);
-                        }
-                        barcodeRequestInProgress = false
-                    }});
-                } else if (assetResult.response.asset === false) {
-                    {% if "ASSETS:ASSET_BARCODES:EDIT:ASSOCIATE_UNNASOCIATED_BARCODES_WITH_ASSETS"|instancePermissions %}
-                        bootbox.confirm({
-                            title: "Unassociated Barcode",
-                            message: `No asset found with this barcode in {{ USERDATA.instance.instances_name }}.<br/>Would you like to associate the barcode ${barcodeValue} (type ${barcodeType}) with an asset in {{ USERDATA.instance.instances_name }}?`,
-                            buttons: {
-                                confirm: {
-                                    label: 'Yes',
-                                    className: 'btn-success'
-                                },
-                                cancel: {
-                                    label: 'No',
-                                    className: 'btn-default'
-                                }
-                            },
-                            callback: function (result) {
-                                if (result) {
-                                    if (assetResult.response.assetSuggest != false) {
-                                        bootbox.confirm({
-                                            title: "Change Asset Tag",
-                                            message: 'Would you like to assciate this barcode with the asset in {{ USERDATA.instance.instances_name }} that has the Tag ' + assetResult.response.assetSuggest['assets_tag'] + '? The asset is a ' + assetResult.response.assetSuggest['assetTypes_name'] + ' (' + assetResult.response.assetSuggest['manufacturers_name'] + ')',
-                                            buttons: {
-                                                confirm: {
-                                                    label: 'Yes',
-                                                    className: 'btn-default'
-                                                },
-                                                cancel: {
-                                                    label: 'No - pick a different asset',
-                                                    className: 'btn-default'
-                                                }
-                                            
-                                        },
-                                        callback: function (result) {
-                                            if (result) {
-                                                ajaxcall("assets/barcodes/assign.php", {
-                                                    "id": assetResult.response.assetSuggest['assets_id'],
-                                                    "text": barcodeValue,
-                                                    "type": barcodeType
-                                                }, function (result) {
-                                                    scanParseAsset(barcodeValue, barcodeType)
-                                                });
-                                            } else {
-                                                $("#selectAnAssetToAssign-barcode").val(barcodeValue);
-                                                $("#selectAnAssetToAssign-barcodetype").val(barcodeType);
-                                                $('#selectAnAssetToAssign').modal('show');
-                                                barcodeRequestInProgress = false
-                                            }
-                                        }});
-                                    } else {
-                                        $("#selectAnAssetToAssign-barcode").val(barcodeValue);
-                                        $("#selectAnAssetToAssign-barcodetype").val(barcodeType);
-                                        $('#selectAnAssetToAssign').modal('show');
-                                        barcodeRequestInProgress = false
-                                    }
-                                } else {
-                                    barcodeRequestInProgress = false
-                                }
-                            }
+                        if (!result) return;
+                        ajaxcall("assets/barcodes/delete.php", {"barcodes_id": entry.response.barcode.assetsBarcodes_id}, function () {
+                            repeatLookup(entry);
                         });
-                    {% else %}
-                        bootbox.alert("Sorry you don't have permission to associate barcodes with assets in {{ USERDATA.instance.instances_name }}", function () {
-                            barcodeRequestInProgress = false
-                        });
-                    {% endif %}
-                } else if (assetResult.result && assetResult.response.asset) {
-                    appendAssetToList(assetResult.response.asset, assetResult.response.barcode)
-                    barcodeRequestInProgress = false
-                }
-            });
-        }
-        function appendAssetToList(asset, barcode) {
-            $("#assetsScannedList").prepend(`
-                <div class="col-auto d-flex align-items-stretch" style="padding: 10px;">
-                    <div class="card bg-light">
-                        <div class="card-body" style="max-width: 250px;">
-                            <h2 class="lead"><b>${asset.assets_tag}</b> ${asset.assetTypes_name}</h2>
-                            <p class="text-muted text-sm m-0">${asset.assetCategoriesGroups_name} - ${asset.assetCategories_name}<br/>${asset.manufacturers_name}<br/>${new Date().toLocaleTimeString()}</p>
-                        </div>
-                        <div class="card-footer">
-                            <div class="text-right">
-                                <div class="btn-group">
-                                    <button class="btn btn-sm btn-danger deleteBarcodeButton" data-barcode="${barcode}">
-                                        Delete Barcode
-                                    </button>
-                                    <a href="{{CONFIG.ROOTURL}}/asset.php?id=${asset.assetTypes_id}&asset=${asset.assets_id}" class="btn btn-sm btn-default" target="_blank">
-                                        View Asset
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>`);
-        }
-        function deleteBarcode(barcodeId) {
-            bootbox.confirm({
-                title: "Delete Barcode",
-                message: 'Are you sure you wish to delete this barcode? All scan history for this barcode will be lost',
-                buttons: {
-                    confirm: {
-                        label: 'Yes',
-                        className: 'btn-danger'
-                    },
-                    cancel: {
-                        label: 'No',
-                        className: 'btn-success'
                     }
-                
-            },
-            callback: function (result) {
-                if (result) {
-                    ajaxcall("assets/barcodes/delete.php", {
-                        "barcodes_id": barcodeId,
-                    }, function (result) {
-                        bootbox.alert("Barcode deleted");
-                        $("button.deleteBarcodeButton[data-barcode='" + barcodeId + "']").remove();
-                    });
-                }
-            }});
-        }
-        function setScanLocation(value, name, type) {
-            localStorage.setItem("adamrms-barcode-scan-location-value", value)
-            localStorage.setItem("adamrms-barcode-scan-location-name", name)
-            localStorage.setItem("adamrms-barcode-scan-location-type", type)
-            barcodeScanLocation = {
-                value: value,
-                name: name,
-                type: type
-            }
-            $("#setLocationCard").hide()
-            $("#currentLocationText").html("Current Location: " + name)
-            $("#assetsScannedList").parent().show()
-            $("#currentLocationCard").show()
-            $("#barcodeScanStartButton").html("Start Scanning Assets")
-        }
-        function clearScanLocation() {
-            localStorage.removeItem("adamrms-barcode-scan-location-value")
-            localStorage.removeItem("adamrms-barcode-scan-location-name")
-            localStorage.removeItem("adamrms-barcode-scan-location-type")
-            barcodeScanLocation = {
-                value: null,
-                name: null,
-                type: false
-            }
-            $("#barcodeScanStartButton").html("Start Scanning to Set Location")
-            $("#assetsScannedList").parent().hide()
-            $("#setLocationCard").show()
-            $("#currentLocationCard").hide()
-        }
-        $(document).ready(function () {
-            if (localStorage.getItem("adamrms-barcode-scan-location-value") !== null && localStorage.getItem("adamrms-barcode-scan-location-name") !== null && localStorage.getItem("adamrms-barcode-scan-location-type") !== null) {
-                setScanLocation(localStorage.getItem("adamrms-barcode-scan-location-value"), localStorage.getItem("adamrms-barcode-scan-location-name"), localStorage.getItem("adamrms-barcode-scan-location-type"))
-            } else {
-                clearScanLocation()
-            }
-            $("#changeLocationButton").on('click', function() {
-                clearScanLocation()
-            })
-            $("#setCustomLocationButton").on('click', function() {
-                setScanLocation($("#customLocationText").val(), $("#customLocationText").val(), "custom")
-            })
-            $('body').on('click', ".deleteBarcodeButton[data-barcode]", function() {
-                deleteBarcode($(this).data("barcode"))
-            })
+                });
+            });
+            $("#barcodeLookupResult").on("click", ".lookup-assign-barcode", function () {
+                var scan = barcodeLookupCurrent.scan;
+                $("#selectAnAssetToAssign-barcode").val(scan.value);
+                $("#selectAnAssetToAssign-barcodetype").val(scan.type);
+                $("#selectAnAssetToAssign-text").text("Search for the asset the barcode " + scan.value + " belongs to.");
+                $("#selectAnAssetToAssign-assets").val(null).trigger("change");
+                $("#selectAnAssetToAssign").modal("show");
+            });
+
             $("#selectAnAssetToAssign-assets").select2({
                 tags: false,
                 multiple: false,
                 theme: "bootstrap4",
                 minimumInputLength: 1,
                 width: '100%',
-
-                minimumResultsForSearch: 1,
-                placeholder: "Enter asset numbers to search for assets",
+                dropdownParent: $("#selectAnAssetToAssign"),
+                placeholder: "Asset tag (or its last digits) or asset name",
                 ajax: {
                     url: "{{ CONFIG.ROOTURL }}/api/assets/searchAssets.php",
                     dataType: "json",
                     type: "POST",
                     data: function (params) {
-                        var queryParameters = {
-                            term: params.term,
-                        }
-                        return queryParameters;
+                        return {term: params.term};
                     },
                     processResults: function (data) {
                         if (data && data.result && data.response) {
@@ -326,61 +506,24 @@
                                     }
                                 })
                             };
-                        } else return {
-                            results: []
-                        };
+                        } else return {results: []};
                     }
                 }
             });
-            $("#selectAnAssetToAssign-button").on("click", function() {
-                ajaxcall("assets/barcodes/assign.php", {
-                    "id": $("#selectAnAssetToAssign-assets").val(),
-                    "text": $("#selectAnAssetToAssign-barcode").val(),
-                    "type": $("#selectAnAssetToAssign-barcodetype").val()
-                }, function (result) {
-                    $('#selectAnAssetToAssign').modal('hide');
-                    {% if "ASSETS:EDIT"|instancePermissions %}
-                    bootbox.confirm({
-                        title: "Change Asset Tag",
-                        message: 'Would you like to change the assets tag to ' + $("#selectAnAssetToAssign-barcode").val() + '?',
-                        buttons: {
-                            confirm: {
-                                label: 'Yes',
-                                className: 'btn-default'
-                            },
-                            cancel: {
-                                label: 'No',
-                                className: 'btn-default'
-                            }
-                    },
-                    callback: function (result) {
-                        if (result) {
-                            ajaxcall("assets/editAsset.php", {
-                                "assets_id": $("#selectAnAssetToAssign-assets").val(),
-                                "assets_tag": $("#selectAnAssetToAssign-barcode").val()
-                            }, function (result) {
-                                scanParseAsset($("#selectAnAssetToAssign-barcode").val(), $("#selectAnAssetToAssign-barcodetype").val())
-                                $("#selectAnAssetToAssign-barcode").val('');
-                                $("#selectAnAssetToAssign-barcodetype").val('');
-                                $("#selectAnAssetToAssign-assets").val(null).trigger('change');
-                            });
-                        } else {
-                            scanParseAsset($("#selectAnAssetToAssign-barcode").val(), $("#selectAnAssetToAssign-barcodetype").val())
-                            $("#selectAnAssetToAssign-barcode").val('');
-                            $("#selectAnAssetToAssign-barcodetype").val('');
-                            $("#selectAnAssetToAssign-assets").val(null).trigger('change');
-                        }
-                    }});
-                    {% else %}
-                    scanParseAsset($("#selectAnAssetToAssign-barcode").val(), $("#selectAnAssetToAssign-barcodetype").val())
-                    $("#selectAnAssetToAssign-barcode").val('');
-                    $("#selectAnAssetToAssign-barcodetype").val('');
-                    $("#selectAnAssetToAssign-assets").val(null).trigger('change');
-                    {% endif %}
-                    
+            $("#selectAnAssetToAssign-button").on("click", function () {
+                var assetsId = $("#selectAnAssetToAssign-assets").val();
+                var barcode = $("#selectAnAssetToAssign-barcode").val();
+                var barcodeType = $("#selectAnAssetToAssign-barcodetype").val();
+                if (!assetsId) {
+                    bootbox.alert("Please choose an asset first.");
+                    return;
+                }
+                ajaxcall("assets/barcodes/assign.php", {"id": assetsId, "text": barcode, "type": barcodeType}, function () {
+                    $("#selectAnAssetToAssign").one("hidden.bs.modal", function () {
+                        assignedBarcodeToAsset(assetsId, barcode, barcodeType);
+                    }).modal("hide");
                 });
             });
-
-        })
+        });
     </script>
 {% endblock %}
