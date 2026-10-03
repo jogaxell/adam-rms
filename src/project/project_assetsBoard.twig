@@ -36,6 +36,58 @@
     #navItemLocationDispatch button {
         background-color: transparent;
     }
+    /* Barcode Dispatch: fills the screen on phones/handheld scanners, the log takes whatever height is left */
+    #barcodeDispatchModal .modal-content {
+        height: min(85vh, 720px);
+    }
+    #barcodeDispatchModal .modal-body {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
+    }
+    #barcodeDispatchModal .barcode-dispatch-log {
+        flex: 1 1 auto;
+        min-height: 4rem;
+        overflow-y: auto;
+        border-top: 1px solid rgba(128, 128, 128, .3);
+        padding-top: .25rem;
+    }
+    .barcode-dispatch-log-line {
+        font-size: .875rem;
+        line-height: 1.3;
+        padding: .2rem .25rem;
+        border-bottom: 1px solid rgba(128, 128, 128, .15);
+        overflow-wrap: anywhere;
+    }
+    .barcode-dispatch-log-line:first-child {
+        background-color: rgba(128, 128, 128, .1);
+    }
+    .barcode-dispatch-log-success i { color: #28a745; }
+    .barcode-dispatch-log-warning i { color: #e0a800; }
+    .barcode-dispatch-log-danger { color: #dc3545; }
+    .barcode-dispatch-log-info i { color: #17a2b8; }
+    #barcodeDispatchModal .barcode-dispatch-hint {
+        line-height: 1.25;
+    }
+    @media (max-width: 575.98px) {
+        #barcodeDispatchModal .modal-dialog {
+            margin: 0;
+            max-width: none;
+            height: 100%;
+        }
+        #barcodeDispatchModal .modal-content {
+            height: 100%;
+            border: 0;
+            border-radius: 0;
+        }
+        #barcodeDispatchModal .modal-header {
+            padding: .4rem .75rem;
+        }
+        #barcodeDispatchModal .modal-title {
+            font-size: 1.05rem;
+        }
+    }
 </style>
 <div class="card card-primary card-outline card-outline-tabs">
     <div class="card-header p-0 border-bottom-0 card-tabs">
@@ -151,60 +203,85 @@
         </div>
     </div>
 </div>
-<div class="modal fade" id="barcodeDispatchModal">
-    <div class="modal-dialog modal-xl">
+<div class="modal fade" id="barcodeDispatchModal" tabindex="-1" aria-labelledby="barcodeDispatchModalTitle">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header">
-                <h4 class="modal-title">Barcode Dispatch</h4>
+            <div class="modal-header py-2">
+                <h5 class="modal-title" id="barcodeDispatchModalTitle"><i class="fas fa-barcode mr-1"></i> Barcode Dispatch</h5>
+                <span class="badge badge-warning align-self-center ml-2" id="barcodeDispatchStale" style="display: none;" title="Assets were added to the project - the board reloads when you close this window">Board reloads on close</span>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
-            <div class="modal-body">
-                <ul class="nav nav-tabs" role="tablist">
+            <div class="modal-body p-2">
+                {% if FINANCIALS.assetsAssignedSUB|length > 0 %}
+                <ul class="nav nav-tabs nav-tabs-sm mb-2" role="tablist">
                     {% if FINANCIALS.assetsAssigned|length > 0 %}
                         <li class="nav-item">
-                            <a class="nav-link active" data-toggle="pill" href="#barcode-dispatch-modal-board-thisinstance" role="tab" aria-controls="barcode-dispatch-modal-board-thisinstance" aria-selected="true">{{ USERDATA.instance.instances_name }}</a>
+                            <a class="nav-link py-1 active" data-toggle="pill" href="#barcode-dispatch-modal-board-thisinstance" role="tab" aria-controls="barcode-dispatch-modal-board-thisinstance" aria-selected="true">{{ USERDATA.instance.instances_name }}</a>
                         </li>
                     {% endif %}
                     {% for instance in FINANCIALS.assetsAssignedSUB %}
                         <li class="nav-item">
-                            <a class="nav-link{% if FINANCIALS.assetsAssigned|length == 0 and loop.first %} active{% endif %}" data-toggle="pill" href="#barcode-dispatch-modal-board-instance{{ instance['instance'].instances_id }}" role="tab" aria-controls="barcode-dispatch-modal-board-instance{{ instance['instance'].instances_id }}" aria-selected="false">{{  instance['instance'].instances_name }}</a>
+                            <a class="nav-link py-1{% if FINANCIALS.assetsAssigned|length == 0 and loop.first %} active{% endif %}" data-toggle="pill" href="#barcode-dispatch-modal-board-instance{{ instance['instance'].instances_id }}" role="tab" aria-controls="barcode-dispatch-modal-board-instance{{ instance['instance'].instances_id }}" aria-selected="false">{{  instance['instance'].instances_name }}</a>
                         </li>
                     {% endfor %}
                 </ul>
-                <div class="p-3">
-                    <div class="tab-content">
-                        {% if FINANCIALS.assetsAssigned|length > 0 %}
-                        <div class="tab-pane show active p2" id="barcode-dispatch-modal-board-thisinstance" role="tabpanel">
-                            <p>Scan a barcode for an asset from {{ USERDATA.instance.instances_name }} to set its status.</p>
-                            <div class="form-group">
-                                <label>Set Asset Status to</label>
-                                <select class="form-control assetStatusSelectorBarcodeDispatch" data-instanceid="{{ USERDATA.instance["instances_id"] }}">
-                                    {% for status in BOARDSTATUSES[USERDATA.instance["instances_id"]] %}
-                                    <option value="{{ status['assetsAssignmentsStatus_id'] }}">{{ status['assetsAssignmentsStatus_name'] }}</option>
-                                    {% endfor %}
-                                </select>
+                {% endif %}
+                <div class="form-row">
+                    <div class="col-12 col-sm-6 mb-1">
+                        <div class="tab-content">
+                            {% if FINANCIALS.assetsAssigned|length > 0 %}
+                            <div class="tab-pane show active" id="barcode-dispatch-modal-board-thisinstance" role="tabpanel">
+                                <div class="input-group input-group-sm">
+                                    <div class="input-group-prepend"><label class="input-group-text" for="barcodeDispatchStatus{{ USERDATA.instance["instances_id"] }}" title="Status scanned assets are set to"><i class="fas fa-tasks mr-1"></i> Status</label></div>
+                                    <select class="form-control assetStatusSelectorBarcodeDispatch" id="barcodeDispatchStatus{{ USERDATA.instance["instances_id"] }}" data-instanceid="{{ USERDATA.instance["instances_id"] }}">
+                                        {% for status in BOARDSTATUSES[USERDATA.instance["instances_id"]] %}
+                                        <option value="{{ status['assetsAssignmentsStatus_id'] }}">{{ status['assetsAssignmentsStatus_name'] }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
                             </div>
-                        </div>
-                        {% endif %}
-                        {% for instance in FINANCIALS.assetsAssignedSUB %}
-                        <div class="tab-pane p2{% if FINANCIALS.assetsAssigned|length == 0 and loop.first %} show active{% endif %}" id="barcode-dispatch-modal-board-instance{{ instance['instance']['instances_id'] }}">
-                            <p>Scan a barcode for an asset from {{  instance['instance'].instances_name }} to set its status.</p>
-                            <div class="form-group">
-                                <label>Set Asset Status to</label>
-                                <select class="form-control assetStatusSelectorBarcodeDispatch" data-instanceid="{{ instance['instance']['instances_id'] }}">
-                                    {% for status in BOARDSTATUSES[instance['instance']['instances_id']] %}
-                                    <option value="{{ status['assetsAssignmentsStatus_id'] }}">{{ status['assetsAssignmentsStatus_name'] }}</option>
-                                    {% endfor %}
-                                </select>
+                            {% endif %}
+                            {% for instance in FINANCIALS.assetsAssignedSUB %}
+                            <div class="tab-pane{% if FINANCIALS.assetsAssigned|length == 0 and loop.first %} show active{% endif %}" id="barcode-dispatch-modal-board-instance{{ instance['instance']['instances_id'] }}" role="tabpanel">
+                                <div class="input-group input-group-sm">
+                                    <div class="input-group-prepend"><label class="input-group-text" for="barcodeDispatchStatus{{ instance['instance']['instances_id'] }}" title="Status scanned assets are set to"><i class="fas fa-tasks mr-1"></i> Status</label></div>
+                                    <select class="form-control assetStatusSelectorBarcodeDispatch" id="barcodeDispatchStatus{{ instance['instance']['instances_id'] }}" data-instanceid="{{ instance['instance']['instances_id'] }}">
+                                        {% for status in BOARDSTATUSES[instance['instance']['instances_id']] %}
+                                        <option value="{{ status['assetsAssignmentsStatus_id'] }}">{{ status['assetsAssignmentsStatus_name'] }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
                             </div>
+                            {% endfor %}
                         </div>
-                        {% endfor %}
                     </div>
-                    {% embed 'assets/widgets/barcodeScanner.twig' with {"scannerCallback": "dispatchBarcodeScanned", "scannerIdSuffix": "Dispatch"} %}
-                    {% endembed %}
-                    <div id="barcodeDispatchResult"></div>
+                    <div class="col-12 col-sm-6 mb-1">
+                        <div class="input-group input-group-sm">
+                            <div class="input-group-prepend"><label class="input-group-text" for="barcodeDispatchLocation" title="Where scanned assets are recorded - or scan a location barcode"><i class="fas fa-map-marker-alt mr-1"></i> Location</label></div>
+                            <select class="form-control" id="barcodeDispatchLocation">
+                                <option value="none">None - status only</option>
+                                {% if project.locations_id %}
+                                <option value="project">Project venue ({{ project.locations_name }})</option>
+                                {% endif %}
+                                <option value="storage">Each asset's storage location</option>
+                                {% if barcodeDispatchLocations|length > 0 %}
+                                <optgroup label="Location">
+                                    {% for location in barcodeDispatchLocations %}
+                                    <option value="barcode:{{ location.locationsBarcodes_id }}" data-name="{{ location.locations_name }}">{{ location.label }}</option>
+                                    {% endfor %}
+                                </optgroup>
+                                {% endif %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <p class="small text-muted mb-1 barcode-dispatch-hint" id="barcodeDispatchHint"></p>
+                {% embed 'assets/widgets/barcodeScanner.twig' with {"scannerCallback": "dispatchBarcodeScanned", "scannerIdSuffix": "Dispatch"} %}
+                {% endembed %}
+                <div class="barcode-dispatch-log mt-2" id="barcodeDispatchResult" aria-live="polite">
+                    <p class="text-muted small text-center my-3 barcode-dispatch-log-empty">Scanned assets will appear here.</p>
                 </div>
             </div>
         </div>
@@ -449,139 +526,208 @@
             });
         });
     }
-    /**
-     * Function to handle a barcode scan for asset dispatch
-     * Called by the shared barcode scanner widget
-     * @param value The barcode value
-     * @param type The barcode format type (e.g. 'QR_CODE', 'CODE_128', or 'UNKNOWN' for USB/Bluetooth)
-     */
-    function dispatchBarcodeScanned(value, type) {
-        var assetStatus = $(".assetStatusSelectorBarcodeDispatch:visible").val();
-        var instanceId = $(".assetStatusSelectorBarcodeDispatch:visible").data("instanceid");
-        var requestData = {
-            text: value,
-            assetsAssignments_status: assetStatus,
-            projects_id: {{ project.projects_id }},
-            instances_id: instanceId
-        };
-        if (type && type !== "UNKNOWN") {
-            requestData.type = type;
+    // ── Barcode Dispatch ──────────────────────────────────────────────────
+    // Every scanned asset gets the chosen status and, if a location is chosen, is recorded at that location.
+    // Scanning a location barcode switches the location. Called by the shared barcode scanner widget, one scan at a time.
+    var barcodeDispatchStorageKey = "adamrms-barcodeDispatch-{{ project.projects_id }}";
+    var barcodeDispatchBoardStale = false;
+
+    function barcodeDispatchStatusSelect() {
+        return $("#barcodeDispatchModal .tab-pane.active .assetStatusSelectorBarcodeDispatch");
+    }
+    function barcodeDispatchSaveSettings() {
+        var statuses = {};
+        $(".assetStatusSelectorBarcodeDispatch").each(function () {
+            statuses[$(this).data("instanceid")] = $(this).val();
+        });
+        try {
+            localStorage.setItem(barcodeDispatchStorageKey, JSON.stringify({location: $("#barcodeDispatchLocation").val(), statuses: statuses}));
+        } catch (e) {}
+    }
+    function barcodeDispatchRestoreSettings() {
+        var settings = {};
+        try {
+            settings = JSON.parse(localStorage.getItem(barcodeDispatchStorageKey)) || {};
+        } catch (e) {}
+        $.each(settings.statuses || {}, function (instanceId, statusId) {
+            var select = $(".assetStatusSelectorBarcodeDispatch[data-instanceid='" + instanceId + "']");
+            if (select.find("option").filter(function () { return this.value == statusId; }).length) select.val(statusId);
+        });
+        var locationSelect = $("#barcodeDispatchLocation");
+        if (settings.location && locationSelect.find("option").filter(function () { return this.value === settings.location; }).length) {
+            locationSelect.val(settings.location);
         }
-        $.ajax({
+        barcodeDispatchUpdateHint();
+    }
+    function barcodeDispatchUpdateHint() {
+        var status = barcodeDispatchStatusSelect().find("option:selected").text();
+        var location = $("#barcodeDispatchLocation").val();
+        var hint = $("#barcodeDispatchHint").empty().append("Scanned assets are set to ", $("<strong>").text(status));
+        if (location === "none") {
+            hint.append(". No location is recorded - scan a location barcode to add one.");
+        } else {
+            var where;
+            if (location === "storage") where = "their own storage location";
+            else if (location === "project") where = "the project venue";
+            else where = $("#barcodeDispatchLocation option:selected").data("name");
+            hint.append(" and recorded at ", $("<strong>").text(where), ". Scan a location barcode to change it.");
+        }
+    }
+    function barcodeDispatchLog(kind, title, detail) {
+        var icons = {success: "fa-check-circle", warning: "fa-exclamation-triangle", danger: "fa-times-circle", info: "fa-map-marker-alt"};
+        var log = $("#barcodeDispatchResult");
+        log.find(".barcode-dispatch-log-empty").remove();
+        var line = $("<div>").addClass("barcode-dispatch-log-line barcode-dispatch-log-" + kind)
+            .append($("<small>").addClass("text-muted float-right ml-1").text(new Date().toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", second: "2-digit"})))
+            .append($("<i>").addClass("fas fa-fw mr-1 " + icons[kind]))
+            .append($("<strong>").text(title));
+        if (detail) line.append($("<span>").text(" " + detail));
+        log.prepend(line);
+        log.children(".barcode-dispatch-log-line").slice(50).remove();
+        log.scrollTop(0);
+        if (navigator.vibrate) {
+            try {
+                navigator.vibrate(kind === "danger" ? [80, 60, 80] : (kind === "warning" ? [40, 60, 40] : 40));
+            } catch (e) {}
+        }
+    }
+    function barcodeDispatchRequestData(value, type) {
+        var statusSelect = barcodeDispatchStatusSelect();
+        var location = $("#barcodeDispatchLocation").val();
+        var data = {
+            text: value,
+            assetsAssignments_status: statusSelect.val(),
+            projects_id: {{ project.projects_id }},
+            instances_id: statusSelect.data("instanceid"),
+            recordScan: "location",
+            scanned: "true"
+        };
+        if (type && type !== "UNKNOWN") data.type = type;
+        if (location === "project" || location === "storage") {
+            data.locationType = location;
+        } else if (location && location.indexOf("barcode:") === 0) {
+            data.locationType = "barcode";
+            data.location = location.substring("barcode:".length);
+        }
+        return data;
+    }
+    function barcodeDispatchPost(data) {
+        return $.ajax({
             url: "{{ CONFIG.ROOTURL }}/api/projects/assets/setStatusBarcode.php",
             type: "POST",
-            data: requestData,
+            data: data,
             cache: false,
-            success: function(result, status, data) {
-                if (result.result === true) {
-                    var assetCard = $(".assetDispatchAssetList[data-instance=" + instanceId + "] .assetDispatchAssetList-card[data-asset=" + result.response.assets_id + "]");
-                    assetCard.detach().appendTo(".assetDispatchAssetList[data-statusid=" + assetStatus + "][data-instance=" + instanceId + "]");
-                    drawButtons();
-                    Toast.fire({
-                        type: 'success',
-                        title: 'Asset dispatched via barcode'
-                    });
-                } else if (result.error && result.error.code === "NOTASSIGNED" && ('assets_id' in result.error) && canAssignAssets) {
-                    // Supermarket Sweep: asset exists but is not assigned to this project
-                    // Prevent multiple concurrent NOTASSIGNED flows (scanner may fire repeatedly)
-                    if (window.barcodeAssignInProgress) {
+            timeout: 20000
+        });
+    }
+    function barcodeDispatchSucceeded(response, data, prefix) {
+        var instanceId = data.instances_id;
+        var assetCard = $(".assetDispatchAssetList[data-instance=" + instanceId + "] .assetDispatchAssetList-card[data-asset=" + response.assets_id + "]");
+        if (assetCard.length) {
+            assetCard.detach().appendTo(".assetDispatchAssetList[data-statusid=" + data.assetsAssignments_status + "][data-instance=" + instanceId + "]");
+            assetCard[0].dataset.currentstatus = data.assetsAssignments_status;
+            drawButtons();
+            // Keep the Location Dispatch table's "Current Location" in step with what was just recorded
+            if (response.location_name) {
+                $(".location-dispatch-asset-checkbox[data-assignment='" + assetCard.data("assignment") + "']").closest("tr").children("td").eq(4).text(response.location_name);
+            }
+        }
+        var detail = (prefix ? prefix + " " : "") + "→ " + response.assetsAssignmentsStatus_name;
+        if (response.location_name) {
+            detail += " · " + response.location_name;
+            barcodeDispatchLog("success", aTag(response.assets_tag) + " " + response.assetTypes_name, detail);
+        } else if (response.locationSkipped === "NOSTORAGELOCATION") {
+            barcodeDispatchLog("warning", aTag(response.assets_tag) + " " + response.assetTypes_name, detail + " · no storage location set, so no location recorded");
+        } else {
+            barcodeDispatchLog("success", aTag(response.assets_tag) + " " + response.assetTypes_name, detail);
+        }
+    }
+    function barcodeDispatchSetScannedLocation(location) {
+        if (location.locations_archived == 1) {
+            barcodeDispatchLog("danger", location.locations_name, "is archived - location not changed");
+            return;
+        }
+        var select = $("#barcodeDispatchLocation");
+        var value = "barcode:" + location.locationsBarcodes_id;
+        if (!select.find("option").filter(function () { return this.value === value; }).length) {
+            var group = select.children("optgroup");
+            if (!group.length) group = $("<optgroup>").attr("label", "Location").appendTo(select);
+            group.append($("<option>").val(value).attr("data-name", location.locations_name).text(location.locations_name));
+        }
+        select.val(value);
+        barcodeDispatchSaveSettings();
+        barcodeDispatchUpdateHint();
+        barcodeDispatchLog("info", location.locations_name, "is now the location for scanned assets");
+    }
+    function barcodeDispatchErrorText(error, fallback) {
+        if (!error) return fallback;
+        if (error.code === "NOTASSIGNED") return "is not on this project - skipped";
+        return error.message || fallback;
+    }
+    function barcodeDispatchOfferAssign(error, data, done) {
+        var assetName = aTag(error.assets_tag) + " " + error.assetTypes_name;
+        bootbox.confirm({
+            title: "Add asset to project?",
+            message: $("<div>").append($("<strong>").text(assetName), " is not on this project. Add it and set its status?").html(),
+            buttons: {
+                confirm: {label: "Add to project", className: "btn-success"},
+                cancel: {label: "Skip", className: "btn-default"}
+            },
+            callback: function (confirmed) {
+                if (!confirmed) {
+                    barcodeDispatchLog("warning", assetName, "is not on this project - skipped");
+                    done();
+                    return;
+                }
+                $.ajax({
+                    url: "{{ CONFIG.ROOTURL }}/api/projects/assets/assign.php",
+                    type: "POST",
+                    data: {projects_id: {{ project.projects_id }}, assets_id: error.assets_id},
+                    cache: false,
+                    timeout: 20000
+                }).done(function (assignResult) {
+                    if (!assignResult || assignResult.result !== true) {
+                        barcodeDispatchLog("danger", assetName, "could not be added: " + ((assignResult && assignResult.error && assignResult.error.message) || "unknown error"));
+                        done();
                         return;
                     }
-                    window.barcodeAssignInProgress = true;
-                    bootbox.confirm({
-                        title: "Add asset to project?",
-                        message: "This asset is not currently assigned to this project. Would you like to add it to the project and set its status?",
-                        callback: function(confirmed) {
-                            if (confirmed) {
-                                $.ajax({
-                                    url: "{{ CONFIG.ROOTURL }}/api/projects/assets/assign.php",
-                                    type: "POST",
-                                    data: {
-                                        projects_id: {{ project.projects_id }},
-                                        assets_id: result.error.assets_id
-                                    },
-                                    cache: false,
-                                    success: function(assignResult) {
-                                        if (assignResult.result === true) {
-                                            // Asset assigned, now set its status via barcode dispatch
-                                            $.ajax({
-                                                url: "{{ CONFIG.ROOTURL }}/api/projects/assets/setStatusBarcode.php",
-                                                type: "POST",
-                                                data: requestData,
-                                                cache: false,
-                                                success: function(retryResult) {
-                                                    if (retryResult.result === true) {
-                                                        Toast.fire({
-                                                            type: 'success',
-                                                            title: 'Asset added to project and dispatched via barcode'
-                                                        });
-                                                        // Clear in-progress flag before reload
-                                                        window.barcodeAssignInProgress = false;
-                                                        // Reload to show the newly assigned asset on the board
-                                                        location.reload();
-                                                    } else {
-                                                        // Assignment succeeded but status change failed
-                                                        Toast.fire({
-                                                            type: 'warning',
-                                                            title: 'Asset added to project but status could not be updated'
-                                                        });
-                                                        window.barcodeAssignInProgress = false;
-                                                        location.reload();
-                                                    }
-                                                },
-                                                error: function() {
-                                                    Toast.fire({
-                                                        type: 'warning',
-                                                        title: 'Asset added to project but status could not be updated'
-                                                    });
-                                                    window.barcodeAssignInProgress = false;
-                                                    location.reload();
-                                                }
-                                            });
-                                        } else {
-                                            var assignErrorMsg = assignResult.error ? assignResult.error.message : "Could not assign asset to project";
-                                            Toast.fire({
-                                                type: 'error',
-                                                title: value + ": " + assignErrorMsg
-                                            });
-                                            var resultDiv = $("<div>").addClass("alert alert-danger").text(value + ": " + assignErrorMsg);
-                                            $("#barcodeDispatchResult").prepend(resultDiv);
-                                            window.barcodeAssignInProgress = false;
-                                        }
-                                    },
-                                    error: function() {
-                                        window.barcodeAssignInProgress = false;
-                                        bootbox.alert('Sorry we couldn\'t connect to the internet - please check your connection');
-                                    }
-                                });
-                            } else {
-                                // User cancelled - show the original error so it's clear nothing changed
-                                Toast.fire({
-                                    type: 'info',
-                                    title: 'Asset not added to project'
-                                });
-                                var resultDiv = $("<div>").addClass("alert alert-warning").text(value + ": Asset not assigned to project - skipped");
-                                $("#barcodeDispatchResult").prepend(resultDiv);
-                                window.barcodeAssignInProgress = false;
-                            }
-                        }
+                    // The new asset has no card on the board yet - reload once the user has finished scanning
+                    barcodeDispatchBoardStale = true;
+                    $("#barcodeDispatchStale").show();
+                    barcodeDispatchPost(data).done(function (retryResult) {
+                        if (retryResult.result === true) barcodeDispatchSucceeded(retryResult.response, data, "added to project");
+                        else barcodeDispatchLog("warning", assetName, "added to project, but the status could not be set: " + barcodeDispatchErrorText(retryResult.error, "unknown error"));
+                        done();
+                    }).fail(function () {
+                        barcodeDispatchLog("warning", assetName, "added to project, but the status could not be set - no connection to the server");
+                        done();
                     });
-                } else {
-                    var errorMsg = (result.error && result.error.message) ? result.error.message : "Barcode not found or asset not assigned to project";
-                    Toast.fire({
-                        type: 'error',
-                        title: value + ": " + errorMsg
-                    });
-                    var resultDiv = $("<div>").addClass("alert alert-danger").text(value + ": " + errorMsg);
-                    $("#barcodeDispatchResult").prepend(resultDiv);
-                }
-            },
-            error: function (jqXHR, textStatus, errorThrown) {
-                console.log(jqXHR, textStatus, errorThrown);
-                bootbox.alert('Sorry we couldn\'t connect to the internet - please check your connection', function () {
-                    location.reload();
+                }).fail(function () {
+                    barcodeDispatchLog("danger", assetName, "could not be added - no connection to the server");
+                    done();
                 });
             }
+        });
+    }
+    function dispatchBarcodeScanned(value, type, done) {
+        var data = barcodeDispatchRequestData(value, type);
+        barcodeDispatchPost(data).done(function (result) {
+            if (result.result === true) {
+                barcodeDispatchSucceeded(result.response, data);
+                done();
+            } else if (result.error && result.error.code === "ISLOCATION") {
+                barcodeDispatchSetScannedLocation(result.error.location);
+                done();
+            } else if (result.error && result.error.code === "NOTASSIGNED" && ('assets_id' in result.error) && canAssignAssets) {
+                barcodeDispatchOfferAssign(result.error, data, done);
+            } else {
+                var title = (result.error && result.error.assets_tag) ? aTag(result.error.assets_tag) + " " + result.error.assetTypes_name : value;
+                barcodeDispatchLog("danger", title, barcodeDispatchErrorText(result.error, "Barcode not found"));
+                done();
+            }
+        }).fail(function () {
+            barcodeDispatchLog("danger", value, "not processed - no connection to the server. Please scan it again.");
+            done();
         });
     }
     {% endif %}
@@ -664,6 +810,19 @@
             doQuickDispatch();
         });
         $("#goQuickDispatch").on("click", doQuickDispatch);
+
+        // ── Barcode Dispatch settings ─────────────────────────────────────────
+        barcodeDispatchRestoreSettings();
+        $(".assetStatusSelectorBarcodeDispatch, #barcodeDispatchLocation").on("change", function () {
+            barcodeDispatchSaveSettings();
+            barcodeDispatchUpdateHint();
+        });
+        $("#barcodeDispatchModal").on("shown.bs.tab", function () {
+            barcodeDispatchUpdateHint();
+        });
+        $("#barcodeDispatchModal").on("hidden.bs.modal", function () {
+            if (barcodeDispatchBoardStale) location.reload();
+        });
 
         // ── Location Dispatch ─────────────────────────────────────────────────
 

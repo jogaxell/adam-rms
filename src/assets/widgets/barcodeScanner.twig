@@ -1,14 +1,22 @@
-{# 
+{#
     Shared barcode scanner widget.
-    
-    Provides camera-based barcode scanning (via ZXing.js) and USB/Bluetooth text input.
-    
+
+    A single compact row: scan input, submit, on-screen keyboard toggle and camera toggle. Built for
+    handheld keyboard-wedge scanners: the input is focused automatically, never opens the soft keyboard
+    (inputmode="none") and takes focus back after stray taps, so the next scan always lands in it.
+    Scans are queued and handed to the callback one at a time, so fast scanning never drops a code.
+
     Parameters (passed via embed/include with):
     - scannerCallback: JavaScript function name (string) to call when a barcode is scanned.
-                       The function will be called as: functionName(value, type)
-                       where value is the barcode text and type is the barcode format name 
+                       The function will be called as: functionName(value, type, done)
+                       where value is the barcode text and type is the barcode format name
                        (e.g. 'QR_CODE', 'CODE_128') or 'UNKNOWN' for USB/Bluetooth text input.
+                       If the function declares the third parameter it must call done() once it has
+                       finished handling the scan; the next queued scan waits until then. Functions
+                       declaring only (value, type) are treated as finished as soon as they return.
     - scannerIdSuffix: Unique suffix for HTML element IDs to allow multiple scanners on a page (default: '')
+
+    Each instance exposes window.barcodeScanner[suffix] with focus() and queueLength().
 #}
 {% set suffix = scannerIdSuffix|default('') %}
 <script src="{{ CONFIG.ROOTURL }}/static-assets/libs/zxing-js/v0.21.min.js"></script>
@@ -53,178 +61,245 @@
         ];
     }
 </script>
-<div class="row" id="errorCardContainer{{ suffix }}" style="display: none;">
-    <div class="col-12">
-        <div class="alert alert-warning">
-            <i class="fas fa-exclamation-triangle"></i> No camera found on this device. You can still use a USB or Bluetooth barcode scanner, or type a barcode value manually below.
+<style>
+    .barcode-scanner .barcode-scanner-queue { min-width: 2.5rem; justify-content: center; }
+    .barcode-scanner .barcode-scanner-camera video { width: 100%; max-height: 35vh; object-fit: cover; background: #000; border-radius: .25rem; }
+    .barcode-scanner input.barcode-scanner-input { font-size: 1rem; }
+</style>
+<div class="barcode-scanner" id="barcodeScanner{{ suffix }}">
+    <div class="input-group">
+        <input type="text" class="form-control barcode-scanner-input" id="barcodeScanTextInput{{ suffix }}" placeholder="Scan a barcode…" inputmode="none" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="go" aria-label="Barcode">
+        <div class="input-group-append">
+            <span class="input-group-text barcode-scanner-queue" id="barcodeScanQueue{{ suffix }}" title="Scans waiting to be processed" style="display: none;"></span>
+            <button class="btn btn-primary" type="button" id="barcodeScanTextButton{{ suffix }}" title="Submit">
+                <i class="fas fa-arrow-right"></i>
+            </button>
+            <button class="btn btn-outline-secondary" type="button" id="barcodeScanKeyboardButton{{ suffix }}" title="Type a barcode with the on-screen keyboard">
+                <i class="fas fa-keyboard"></i>
+            </button>
+            <button class="btn btn-outline-secondary" type="button" id="barcodeScanCameraButton{{ suffix }}" title="Scan with the camera">
+                <i class="fas fa-camera"></i>
+            </button>
         </div>
     </div>
-</div>
-<div class="row">
-    <div class="col-12 col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title"><i class="fas fa-camera"></i> Camera Scanner</h3>
-                <div class="card-tools">
-                    <button class="btn btn-sm btn-danger" title="Stop Scanning" id="barcodeScanResetButton{{ suffix }}" style="display: none;">Stop Scanning</button>
-                </div>
-            </div>
-            <div class="card-body" id="barcodeScanVideoCard{{ suffix }}">
-                <button class="btn btn-success btn-lg" title="Start Scanning" id="barcodeScanStartButton{{ suffix }}">Start Camera Scanning</button>
-                <video id="barcodeScanVideo{{ suffix }}" width="1920" style="border: 0;"></video>
-            </div>
-            <div class="card-footer" id="barcodeScanSourceSelectPanel{{ suffix }}" style="display: none;">
-                <div class="input-group my-2">
-                    <div class="input-group-prepend">
-                        <span class="input-group-text">
-                            Camera:
-                        </span>
-                    </div>
-                    <select class="form-control" id="barcodeScanSourceSelect{{ suffix }}"></select>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-12 col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title"><i class="fas fa-keyboard"></i> USB/Bluetooth Scanner</h3>
-            </div>
-            <div class="card-body">
-                <p>Use a USB or Bluetooth barcode scanner, or type a barcode value manually and press Enter.</p>
-                <div class="input-group">
-                    <input type="text" class="form-control" id="barcodeScanTextInput{{ suffix }}" placeholder="Scan or type barcode value">
-                    <div class="input-group-append">
-                        <button class="btn btn-primary" type="button" id="barcodeScanTextButton{{ suffix }}">
-                            <i class="fas fa-arrow-right"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <div class="barcode-scanner-camera mt-1" id="barcodeScanCameraPanel{{ suffix }}" style="display: none;">
+        <select class="form-control form-control-sm mb-1" id="barcodeScanSourceSelect{{ suffix }}" style="display: none;" aria-label="Camera"></select>
+        <video id="barcodeScanVideo{{ suffix }}" muted playsinline></video>
     </div>
 </div>
 <script>
     (function() {
         var suffix = {{ suffix|json_encode|raw }};
-        var callbackFn = (function() {
-            // scannerCallback is documented as a function name string.
-            // Keep it as a string and resolve lazily via window[callbackName].
-            var callbackName = {{ scannerCallback|json_encode|raw }};
-            return function(value, type) {
-                if (!callbackName) {
-                    console.error("barcodeScanner widget: scannerCallback name not provided.");
-                    return;
-                }
-                var fn = window[callbackName];
-                if (typeof fn !== "function") {
-                    console.error("barcodeScanner widget: scannerCallback function '" + callbackName + "' not found or not a function.");
-                    return;
-                }
-                try {
-                    fn(value, type);
-                } catch (e) {
-                    console.error("barcodeScanner widget: error while executing scannerCallback '" + callbackName + "':", e);
-                }
-            };
-        })();
+        var callbackName = {{ scannerCallback|json_encode|raw }};
+        var $root = $("#barcodeScanner" + suffix);
+        var $input = $("#barcodeScanTextInput" + suffix);
+        var $submit = $("#barcodeScanTextButton" + suffix);
+        var $keyboard = $("#barcodeScanKeyboardButton" + suffix);
+        var $camera = $("#barcodeScanCameraButton" + suffix);
+        var $queueBadge = $("#barcodeScanQueue" + suffix);
+        // The modal this widget lives in, if any - used to tell "our" modal apart from dialogs opened on top of it
+        var $ownModal = $root.closest(".modal");
 
-        // --- USB/Bluetooth text input handling ---
-        function submitTextBarcode() {
-            var value = $("#barcodeScanTextInput" + suffix).val().trim();
-            if (value.length > 0) {
-                callbackFn(value, "UNKNOWN");
-                $("#barcodeScanTextInput" + suffix).val("").focus();
+        // --- Queue: scans are handed to the callback one at a time ---
+        var queue = [];
+        var busy = false;
+        function updateQueueBadge() {
+            if (queue.length > 0) $queueBadge.text("+" + queue.length).show();
+            else $queueBadge.hide();
+            $submit.find("i").attr("class", busy ? "fas fa-spinner fa-spin" : "fas fa-arrow-right");
+        }
+        function pump() {
+            if (busy || queue.length === 0) return;
+            var item = queue.shift();
+            busy = true;
+            updateQueueBadge();
+            var finished = false;
+            var safetyTimer;
+            function done() {
+                if (finished) return;
+                finished = true;
+                clearTimeout(safetyTimer);
+                busy = false;
+                updateQueueBadge();
+                pump();
+            }
+            // A callback that never reports back (e.g. a lost request) must not block scanning forever
+            safetyTimer = setTimeout(done, 30000);
+            var fn = callbackName ? window[callbackName] : null;
+            if (typeof fn !== "function") {
+                console.error("barcodeScanner widget: scannerCallback function '" + callbackName + "' not found or not a function.");
+                done();
+                return;
+            }
+            try {
+                if (fn.length >= 3) {
+                    fn(item.value, item.type, done);
+                } else {
+                    fn(item.value, item.type);
+                    done();
+                }
+            } catch (e) {
+                console.error("barcodeScanner widget: error while executing scannerCallback '" + callbackName + "':", e);
+                done();
             }
         }
-        $("#barcodeScanTextInput" + suffix).on("keydown", function(e) {
+        function enqueue(value, type) {
+            queue.push({value: value, type: type});
+            updateQueueBadge();
+            pump();
+        }
+
+        // --- Focus handling: keep the input ready for the next hardware scan ---
+        var manualTyping = false;
+        function widgetUsable() {
+            if (!$root.is(":visible")) return false;
+            // Any other modal (including bootbox dialogs) open on top means the user is busy with something else
+            var foreignModalOpen = $(".modal").filter(function() {
+                if ($ownModal.length && this === $ownModal[0]) return false;
+                var bsModal = $(this).data("bs.modal");
+                return $(this).hasClass("show") || (bsModal && bsModal._isShown);
+            }).length > 0;
+            if (foreignModalOpen) return false;
+            if ($(".swal2-popup:not(.swal2-toast)").is(":visible")) return false;
+            return true;
+        }
+        function focusInput() {
+            if (!widgetUsable()) return;
+            if (document.activeElement !== $input[0]) $input[0].focus({preventScroll: true});
+        }
+        function maybeRefocus(force) {
+            if (manualTyping || !widgetUsable()) return;
+            var active = document.activeElement;
+            if (!force && active && active !== $input[0] && active !== document.body) {
+                // Don't steal focus from another control the user is actually using
+                if ($(active).is("input, select, textarea, [contenteditable=true]") || $(active).closest(".select2-container, .select2-dropdown").length) return;
+            }
+            focusInput();
+        }
+        var refocusTimer = null;
+        function scheduleRefocus(force, delay) {
+            clearTimeout(refocusTimer);
+            refocusTimer = setTimeout(function() { maybeRefocus(force); }, delay || 150);
+        }
+        $input.on("blur", function() { scheduleRefocus(false); });
+        // When a select next to the scanner (status, location, camera) has been changed, go back to scanning
+        $(document).on("change select2:close", "select", function() {
+            var $scope = $ownModal.length ? $ownModal : $("body");
+            if ($.contains($scope[0], this) || $(this).hasClass("select2-hidden-accessible")) scheduleRefocus(true, 200);
+        });
+        // A dialog closing (bootbox, other modals) hands focus back
+        $(document).on("hidden.bs.modal", ".modal", function() {
+            if ($ownModal.length && this === $ownModal[0]) return;
+            scheduleRefocus(true, 200);
+        });
+        document.addEventListener("visibilitychange", function() {
+            if (document.visibilityState === "visible") scheduleRefocus(true, 200);
+        });
+        if ($ownModal.length) {
+            $ownModal.on("shown.bs.modal", function() { setManualTyping(false); focusInput(); });
+        } else {
+            $(function() { focusInput(); });
+        }
+
+        // --- On-screen keyboard toggle for typing a code by hand ---
+        function setManualTyping(on) {
+            manualTyping = on;
+            $input.attr("inputmode", on ? "text" : "none");
+            $keyboard.toggleClass("btn-outline-secondary", !on).toggleClass("btn-secondary active", on);
+            $input.attr("placeholder", on ? "Type a barcode and press Enter" : "Scan a barcode…");
+        }
+        $keyboard.on("click", function() {
+            setManualTyping(!manualTyping);
+            // Re-focusing is what makes Android show or hide the keyboard after the inputmode change
+            $input[0].blur();
+            $input[0].focus({preventScroll: true});
+        });
+
+        // --- Submitting a scan ---
+        function submitTextBarcode() {
+            var value = $input.val().trim();
+            $input.val("");
+            if (manualTyping) {
+                setManualTyping(false);
+                $input[0].blur();
+            }
+            $input[0].focus({preventScroll: true});
+            if (value.length > 0) enqueue(value, "UNKNOWN");
+        }
+        $input.on("keydown", function(e) {
             if (e.key !== "Enter") return;
             e.preventDefault();
             submitTextBarcode();
         });
-        $("#barcodeScanTextButton" + suffix).on("click", submitTextBarcode);
+        $submit.on("click", submitTextBarcode);
 
-        // --- Camera scanner setup ---
+        // --- Camera scanner (collapsed by default) ---
         var codeReader = new ZXing.BrowserMultiFormatReader();
-        var selectedDeviceId;
+        var selectedDeviceId = null;
         var scanningActive = false;
+        var lastCameraScan = {value: null, time: 0};
 
+        function disableCamera(reason) {
+            $camera.prop("disabled", true).attr("title", reason);
+        }
         if (codeReader.canEnumerateDevices) {
             codeReader.listVideoInputDevices().then(function(videoInputDevices) {
                 if (videoInputDevices.length < 1) {
-                    throw new Error('NO-DEVICE');
-                }
-                var sourceSelect = document.getElementById('barcodeScanSourceSelect' + suffix);
-                selectedDeviceId = videoInputDevices[0].deviceId;
-                if (videoInputDevices.length > 1) {
-                    videoInputDevices.forEach(function(element) {
-                        var sourceOption = document.createElement('option');
-                        sourceOption.text = element.label;
-                        sourceOption.value = element.deviceId;
-                        sourceSelect.appendChild(sourceOption);
-                    });
-                    sourceSelect.onchange = function() {
-                        selectedDeviceId = sourceSelect.value;
-                    };
-                    $("#barcodeScanSourceSelectPanel" + suffix).show();
-                }
-                document.getElementById('barcodeScanStartButton' + suffix).addEventListener('click', function() {
-                    var barcodeScanVideoWidth = $("#barcodeScanVideoCard" + suffix).width();
-                    if (barcodeScanVideoWidth && barcodeScanVideoWidth > 0) {
-                        $("#barcodeScanVideo" + suffix).attr("width", barcodeScanVideoWidth);
-                    }
-                    $("#barcodeScanResetButton" + suffix).show();
-                    $("#barcodeScanStartButton" + suffix).hide();
-                    scanningActive = true;
-                    codeReader.decodeFromVideoDevice(selectedDeviceId, 'barcodeScanVideo' + suffix, function(result, err) {
-                        if (result) {
-                            callbackFn(result.text, BARCODEFORMATS[result.format]);
-                        }
-                        if (err && !(err instanceof ZXing.NotFoundException)) {
-                            console.error(err);
-                            bootbox.alert("Sorry - Barcode scanner encountered a problem: " + err, function() {
-                                codeReader.reset();
-                            });
-                        }
-                    });
-                });
-                document.getElementById('barcodeScanResetButton' + suffix).addEventListener('click', function() {
-                    cleanupScanner();
-                });
-
-                $(window).on('resize.barcodeScanner' + suffix, function() {
-                    if (!scanningActive) {
-                        return;
-                    }
-                    var barcodeScanVideoWidth = $("#barcodeScanVideoCard" + suffix).width();
-                    if (barcodeScanVideoWidth && barcodeScanVideoWidth > 0) {
-                        $("#barcodeScanVideo" + suffix).attr("width", barcodeScanVideoWidth);
-                    }
-                });
-            })
-            .catch(function(err) {
-                if (err.message == 'NO-DEVICE') {
-                    handleDeviceHasNoCamera();
+                    disableCamera("No camera found on this device");
                     return;
                 }
-                console.error(err);
-                bootbox.alert("Sorry - Barcode scanner encountered a problem: " + err, function() {
-                    location.reload();
+                var sourceSelect = $("#barcodeScanSourceSelect" + suffix);
+                // Prefer a rear-facing camera on phones
+                selectedDeviceId = videoInputDevices[0].deviceId;
+                videoInputDevices.forEach(function(device) {
+                    if (/back|rear|environment/i.test(device.label)) selectedDeviceId = device.deviceId;
                 });
+                if (videoInputDevices.length > 1) {
+                    videoInputDevices.forEach(function(device, index) {
+                        sourceSelect.append($("<option>").val(device.deviceId).text(device.label || ("Camera " + (index + 1))));
+                    });
+                    sourceSelect.val(selectedDeviceId).show();
+                    sourceSelect.on("change", function() {
+                        selectedDeviceId = sourceSelect.val();
+                        if (scanningActive) {
+                            stopCamera();
+                            startCamera();
+                        }
+                    });
+                }
+            }).catch(function(err) {
+                console.error(err);
+                disableCamera("The camera is not available");
             });
         } else {
-            handleDeviceHasNoCamera();
+            disableCamera("The camera is not available in this browser");
         }
 
-        function handleDeviceHasNoCamera() {
-            $('#barcodeScanStartButton' + suffix).prop("disabled", true);
-            $('#errorCardContainer' + suffix).show();
-            // Focus the text input since camera is not available
-            $('#barcodeScanTextInput' + suffix).focus();
+        function startCamera() {
+            $("#barcodeScanCameraPanel" + suffix).show();
+            $camera.removeClass("btn-outline-secondary").addClass("btn-secondary active");
+            scanningActive = true;
+            codeReader.decodeFromVideoDevice(selectedDeviceId, 'barcodeScanVideo' + suffix, function(result, err) {
+                if (result) {
+                    // ZXing reports the same code on every frame while it is in view
+                    var now = Date.now();
+                    if (result.text === lastCameraScan.value && now - lastCameraScan.time < 1500) {
+                        lastCameraScan.time = now;
+                        return;
+                    }
+                    lastCameraScan = {value: result.text, time: now};
+                    enqueue(result.text, BARCODEFORMATS[result.format]);
+                }
+                if (err && !(err instanceof ZXing.NotFoundException) && !(err instanceof ZXing.ChecksumException) && !(err instanceof ZXing.FormatException)) {
+                    console.error(err);
+                }
+            }).catch(function(err) {
+                console.error(err);
+                stopCamera();
+                bootbox.alert("Sorry - the camera could not be started: " + err);
+            });
         }
-
-        // Cleanup function to stop scanning, release camera and remove event handlers
-        function cleanupScanner() {
+        function stopCamera() {
             if (scanningActive) {
                 try {
                     codeReader.reset();
@@ -233,27 +308,28 @@
                 }
                 scanningActive = false;
             }
-            $("#barcodeScanResetButton" + suffix).hide();
-            $("#barcodeScanStartButton" + suffix).show();
-            // Remove resize handler for this scanner instance
-            $(window).off('resize.barcodeScanner' + suffix);
+            $("#barcodeScanCameraPanel" + suffix).hide();
+            $camera.removeClass("btn-secondary active").addClass("btn-outline-secondary");
         }
-
-        // Automatically cleanup when a Bootstrap modal containing this scanner is hidden
-        $(document).on('hidden.bs.modal.barcodeScanner' + suffix, '.modal', function() {
-            if ($(this).find('#barcodeScanVideoCard' + suffix).length > 0) {
-                cleanupScanner();
-            }
+        $camera.on("click", function() {
+            if (scanningActive) stopCamera();
+            else startCamera();
+            scheduleRefocus(true, 50);
         });
 
-        // Cleanup before the page is unloaded
-        window.addEventListener('beforeunload', cleanupScanner);
-
-        // Cleanup when the page becomes hidden (e.g. user switches tab or minimizes)
+        // Release the camera when the modal containing this scanner closes, the page is left or hidden
+        if ($ownModal.length) {
+            $ownModal.on("hidden.bs.modal", stopCamera);
+        }
+        window.addEventListener('beforeunload', stopCamera);
         document.addEventListener('visibilitychange', function() {
-            if (document.visibilityState === 'hidden') {
-                cleanupScanner();
-            }
+            if (document.visibilityState === 'hidden') stopCamera();
         });
+
+        window.barcodeScanner = window.barcodeScanner || {};
+        window.barcodeScanner[suffix] = {
+            focus: function() { maybeRefocus(true); },
+            queueLength: function() { return queue.length; }
+        };
     })();
 </script>

@@ -124,6 +124,37 @@ $DBLIB->where("locations_archived", 0);
 $DBLIB->orderBy("locations_name", "ASC");
 $PAGEDATA['locationDispatchLocations'] = $DBLIB->get("locations", null, ["locations_id", "locations_name"]);
 
+// Locations for the Barcode Dispatch location picker: with their barcode (what a scan records) and in tree order,
+// so sub-locations sit indented under their parent
+$PAGEDATA['barcodeDispatchLocations'] = [];
+if ($AUTH->instancePermissionCheck("PROJECTS:PROJECT_ASSETS:EDIT:ASSIGNMENT_STATUS")) {
+    $DBLIB->where("locations.instances_id", $AUTH->data['instance']['instances_id']);
+    $DBLIB->where("locations.locations_deleted", 0);
+    $DBLIB->where("locations.locations_archived", 0);
+    $DBLIB->where("locationsBarcodes.locationsBarcodes_deleted", 0);
+    $DBLIB->join("locationsBarcodes", "locationsBarcodes.locations_id=locations.locations_id", "INNER");
+    $DBLIB->orderBy("locations.locations_name", "ASC");
+    $DBLIB->orderBy("locationsBarcodes.locationsBarcodes_id", "ASC");
+    $barcodeDispatchLocations = [];
+    foreach ($DBLIB->get("locations", null, ["locations.locations_id", "locations.locations_name", "locations.locations_subOf", "locationsBarcodes.locationsBarcodes_id"]) as $location) {
+        if (!isset($barcodeDispatchLocations[$location['locations_id']])) $barcodeDispatchLocations[$location['locations_id']] = $location; // one barcode per location is enough
+    }
+    $locationsBySubOf = [];
+    foreach ($barcodeDispatchLocations as $location) {
+        // A sub-location whose parent is archived is listed at the top level rather than lost
+        $parent = ($location['locations_subOf'] and isset($barcodeDispatchLocations[$location['locations_subOf']])) ? $location['locations_subOf'] : 0;
+        $locationsBySubOf[$parent][] = $location;
+    }
+    $addBarcodeDispatchLocations = function ($subOf, $tier) use (&$addBarcodeDispatchLocations, &$locationsBySubOf, &$PAGEDATA) {
+        foreach ($locationsBySubOf[$subOf] ?? [] as $location) {
+            $location['label'] = str_repeat("\u{00A0}\u{00A0}\u{00A0}", $tier) . ($tier > 0 ? "↳ " : "") . $location['locations_name'];
+            $PAGEDATA['barcodeDispatchLocations'][] = $location;
+            $addBarcodeDispatchLocations($location['locations_id'], $tier + 1);
+        }
+    };
+    $addBarcodeDispatchLocations(0, 0);
+}
+
 // Locations for each sub-instance present in this project
 $PAGEDATA['locationDispatchSubLocations'] = [];
 foreach ($PAGEDATA['FINANCIALS']['assetsAssignedSUB'] as $subInstance) {
