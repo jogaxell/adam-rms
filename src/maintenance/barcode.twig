@@ -83,6 +83,12 @@
         .barcode-lookup-card .list-group-item {
             padding: .4rem .5rem;
         }
+        .barcode-lookup-card .lookup-whereabouts {
+            flex: 0 0 auto;
+            max-width: 45%;
+            overflow-wrap: anywhere;
+            line-height: 1.2;
+        }
         .barcode-lookup-card .alert {
             padding: .3rem .5rem;
             margin-bottom: .35rem;
@@ -274,11 +280,28 @@
             }
             return card;
         }
+        // Where a stored asset is right now, compared with the location being looked at
+        function renderLookupWhereabouts(whereabouts) {
+            var states = {
+                here: {badge: "badge-success", icon: "fa-check", label: "Here"},
+                elsewhere: {badge: "badge-warning", icon: "fa-truck", label: "Elsewhere"},
+                unknown: {badge: "badge-secondary", icon: "fa-question", label: "Unknown"},
+                noscan: {badge: "badge-light", icon: "fa-minus", label: "Never scanned"}
+            };
+            var state = states[whereabouts.state] || states.unknown;
+            var box = lookupEl("div", "text-right ml-2 lookup-whereabouts");
+            lookupEl("span", "badge " + state.badge).append($("<i>").addClass("fas mr-1 " + state.icon), lookupText(state.label)).appendTo(box);
+            if (whereabouts.location) lookupEl("div", "small text-muted", whereabouts.location).appendTo(box);
+            return box;
+        }
         function renderLookupAssetList(assets) {
             var list = lookupEl("div", "list-group list-group-flush");
             assets.forEach(function (asset) {
-                $("<button>").attr({"type": "button", "data-asset-id": asset.assets_id}).addClass("list-group-item list-group-item-action")
-                    .append(lookupEl("strong", null, aTag(asset.assets_tag)), lookupText(" " + asset.assetTypes_name)).appendTo(list);
+                var item = $("<button>").attr({"type": "button", "data-asset-id": asset.assets_id}).addClass("list-group-item list-group-item-action");
+                var name = lookupEl("div", "flex-grow-1").css("min-width", 0).append(lookupEl("strong", null, aTag(asset.assets_tag)), lookupText(" " + asset.assetTypes_name));
+                if (asset.whereabouts) item.addClass("d-flex align-items-start text-left").append(name, renderLookupWhereabouts(asset.whereabouts));
+                else item.append(name);
+                item.appendTo(list);
             });
             return list;
         }
@@ -304,7 +327,10 @@
 
             var storedHere = $("<details>").addClass("lookup-section").appendTo(body);
             if (!location.hereNow.length) storedHere.attr("open", true);
-            $("<summary>").text("Stored here (" + location.storedHere.length + (location.storedHereMore ? "+" : "") + ")").appendTo(storedHere);
+            var storedSummary = "Stored here (" + location.storedHere.length + (location.storedHereMore ? "+" : "");
+            var storedAway = location.storedHere.filter(function (asset) { return asset.whereabouts && asset.whereabouts.state !== "here"; }).length;
+            if (location.storedHere.length) storedSummary += " · " + (location.storedHere.length - storedAway) + " here, " + storedAway + " not here";
+            $("<summary>").text(storedSummary + ")").appendTo(storedHere);
             if (location.storedHere.length) storedHere.append(renderLookupAssetList(location.storedHere));
             else lookupEl("div", "small text-muted", "No asset has this as its storage location.").appendTo(storedHere);
             if (location.storedHereMore) lookupEl("div", "small text-muted mt-1", "Only the first " + location.storedHere.length + " are shown.").appendTo(storedHere);

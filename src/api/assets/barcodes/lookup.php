@@ -120,6 +120,73 @@ function lookupAsset($assetsId) {
     return $result;
 }
 
+// Adds "whereabouts" to each asset in the list: is it at $homeLocationId (or one of its sub-locations) right now,
+// somewhere else, or has it never been scanned? Uses the latest scan, like the rest of the app.
+function lookupAddWhereabouts(&$assets, $homeLocationId) {
+    global $DBLIB, $instanceId;
+    if (!$assets) return;
+
+    // This location and everything below it counts as "here"
+    $DBLIB->where("instances_id", $instanceId);
+    $DBLIB->where("locations_deleted", 0);
+    $childrenOf = [];
+    foreach ($DBLIB->get("locations", null, ["locations_id", "locations_subOf"]) as $location) {
+        if ($location['locations_subOf']) $childrenOf[$location['locations_subOf']][] = $location['locations_id'];
+    }
+    $hereIds = [$homeLocationId => true];
+    $toVisit = [$homeLocationId];
+    while ($toVisit) {
+        foreach ($childrenOf[array_pop($toVisit)] ?? [] as $childId) {
+            if (isset($hereIds[$childId])) continue;
+            $hereIds[$childId] = true;
+            $toVisit[] = $childId;
+        }
+    }
+
+    $assetIds = array_map('intval', array_column($assets, 'assets_id'));
+    $placeholders = implode(",", array_fill(0, count($assetIds), "?"));
+    $scans = $DBLIB->rawQuery("SELECT assetsBarcodes.assets_id, assetsBarcodesScans.assetsBarcodes_customLocation, assetsBarcodesScans.location_assets_id,
+            locations.locations_id, locations.locations_name, containerAssets.assets_tag AS container_tag, containerTypes.assetTypes_name AS container_typeName
+        FROM assetsBarcodesScans
+        JOIN assetsBarcodes ON assetsBarcodes.assetsBarcodes_id = assetsBarcodesScans.assetsBarcodes_id
+        JOIN (
+            SELECT latestBarcodes.assets_id, MAX(latestScans.assetsBarcodesScans_timestamp) AS latestTimestamp
+            FROM assetsBarcodesScans AS latestScans
+            JOIN assetsBarcodes AS latestBarcodes ON latestBarcodes.assetsBarcodes_id = latestScans.assetsBarcodes_id
+            WHERE latestBarcodes.assetsBarcodes_deleted = 0 AND latestBarcodes.assets_id IN (" . $placeholders . ")
+            GROUP BY latestBarcodes.assets_id
+        ) AS latest ON latest.assets_id = assetsBarcodes.assets_id AND latest.latestTimestamp = assetsBarcodesScans.assetsBarcodesScans_timestamp
+        LEFT JOIN locationsBarcodes ON locationsBarcodes.locationsBarcodes_id = assetsBarcodesScans.locationsBarcodes_id
+        LEFT JOIN locations ON locations.locations_id = locationsBarcodes.locations_id
+        LEFT JOIN assets AS containerAssets ON containerAssets.assets_id = assetsBarcodesScans.location_assets_id
+        LEFT JOIN assetTypes AS containerTypes ON containerTypes.assetTypes_id = containerAssets.assetTypes_id
+        WHERE assetsBarcodes.assetsBarcodes_deleted = 0
+        ORDER BY assetsBarcodesScans.assetsBarcodesScans_id DESC", $assetIds);
+    $latestByAsset = [];
+    foreach ($scans as $scan) {
+        if (!isset($latestByAsset[$scan['assets_id']])) $latestByAsset[$scan['assets_id']] = $scan; // same timestamp twice: newest row wins
+    }
+
+    foreach ($assets as &$asset) {
+        $scan = $latestByAsset[$asset['assets_id']] ?? null;
+        if (!$scan) {
+            $asset['whereabouts'] = ["state" => "noscan", "location" => null];
+        } elseif ($scan['locations_id'] and isset($hereIds[$scan['locations_id']])) {
+            // Here - name the sub-location if it's further down, e.g. a shelf in this store
+            $asset['whereabouts'] = ["state" => "here", "location" => ($scan['locations_id'] == $homeLocationId ? null : $scan['locations_name'])];
+        } elseif ($scan['locations_id']) {
+            $asset['whereabouts'] = ["state" => "elsewhere", "location" => $scan['locations_name']];
+        } elseif ($scan['location_assets_id']) {
+            $asset['whereabouts'] = ["state" => "elsewhere", "location" => "Inside " . $scan['container_typeName'] . " (" . $scan['container_tag'] . ")"];
+        } elseif ($scan['assetsBarcodes_customLocation']) {
+            $asset['whereabouts'] = ["state" => "elsewhere", "location" => $scan['assetsBarcodes_customLocation']];
+        } else {
+            $asset['whereabouts'] = ["state" => "unknown", "location" => null];
+        }
+    }
+    unset($asset);
+}
+
 function lookupLocation($locationsId) {
     global $DBLIB, $instanceId;
     $DBLIB->where("locations.locations_id", $locationsId);
@@ -159,6 +226,7 @@ function lookupLocation($locationsId) {
     $storedHere = $DBLIB->get("assets", LOOKUP_LIST_LIMIT + 1, ["assets.assets_id", "assets.assets_tag", "assetTypes.assetTypes_name"]);
     $location['storedHereMore'] = count($storedHere) > LOOKUP_LIST_LIMIT;
     $location['storedHere'] = array_slice($storedHere, 0, LOOKUP_LIST_LIMIT);
+    lookupAddWhereabouts($location['storedHere'], $location['locations_id']);
 
     $DBLIB->where("instances_id", $instanceId);
     $DBLIB->where("locations_deleted", 0);
