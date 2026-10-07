@@ -1,14 +1,27 @@
-# AdamRMS - GitHub Copilot Instructions
+# AdamRMS - Agent Instructions
+
+Instructions for AI coding agents (Claude Code, GitHub Copilot, etc.) working in this repository.
 
 ## Project Overview
 
 AdamRMS is an advanced Rental Management System for Theatre, AV & Broadcast. It provides comprehensive asset management, project tracking, client management, and billing capabilities for rental businesses in the entertainment industry.
 
+## Project Status: Maintenance Mode
+
+This codebase is in maintenance mode while a rewrite is developed. Changes here should be:
+
+- **Bug fixes, security fixes and small quality-of-life improvements only.** Larger feature requests belong in the rewrite — say so rather than implementing them here.
+- **Minimal and surgical.** Don't refactor, reformat or "improve" code that isn't part of the fix. Match the surrounding style.
+- **Tested.** Every bug fix should come with an e2e test that fails before the fix and passes after it (see Testing below).
+- **One issue or one module per PR**, so each change is easy to review.
+
+Take extra care with, and call out in the PR description, any change that touches authentication, billing/Stripe, instance scoping (multi-tenancy) or database migrations.
+
 ## Technology Stack
 
 ### Backend
 
-- **PHP 8.0+** (runtime uses 8.3): Object-oriented patterns with some procedural code
+- **PHP 8.3** (production runtime): Object-oriented patterns with some procedural code. Do not run on PHP 8.4 — Twig 3.7 compiles closure names that 8.4 formats differently, producing a parse error on logged-in pages
 - **MySQL Database**: Via custom `adam-rms/mysqli-database-class` wrapper
 - **Twig v3.7**: Templating engine for all views
 - **Composer**: Dependency management
@@ -338,14 +351,42 @@ final class AddFeatureColumn extends AbstractMigration
 
 ## Testing & Quality
 
-- **No automated test suite**: No PHPUnit or test framework is currently configured; CI focuses on builds, linting, and doc generation
-- **GitHub Actions**: Docker builds (`dockerBuild.yml`), API docs generation (`generateApiDocs.yaml`), and documentation sync (`syncDocsToAISearch.yml`)
+- **E2E tests**: Playwright (TypeScript) in `e2e/`, run on every PR by `.github/workflows/e2e-tests.yml`. There are no unit tests.
+- **GitHub Actions**: E2E tests (`e2e-tests.yml`), Docker builds (`dockerBuild.yml`), API docs generation (`generateApiDocs.yaml`), and documentation sync (`syncDocsToAISearch.yml`)
+
+### Running the E2E tests
+
+Tests run against PHP's built-in server (started by Playwright) and a real MySQL 8 database. Prerequisites: PHP 8.3 with the Dockerfile's extensions, `composer install`, and MySQL reachable with the devcontainer credentials (`user`/`pass`, database `db` on `127.0.0.1:3306` — override with `DB_*` env vars). Claude Code on the web sets all of this up via `.claude/hooks/session-start.sh`.
+
+```bash
+cd e2e
+npm install
+npx playwright install chromium   # not needed where a browser is pre-installed
+npm test                          # set PHP_BINARY=php8.3 if `php` on your PATH isn't 8.3
+```
+
+`e2e/globalSetup.ts` migrates and seeds the database, then `e2e/setup/seed.php` writes the config the first-run setup form would ask for and makes sure the test super admin `test@example.com` / `password!` exists (resetting its password if it has been changed), so the suite also works against a used devcontainer database. The server runs with `DEV_MODE=true` (as the devcontainer does), so pages that require login show the auth error and a login link instead of redirecting.
+
+### Writing E2E tests
+
+- `e2e/static/` — checks on the source that need no server: every PHP file parses, every `require` of a `__DIR__`-relative path and every template a `render()` call or Twig tag names exists, and every Twig template compiles with only filters, functions and tags that exist (`e2e/setup/lint.php`).
+- `e2e/public/` — tests that don't need a session. `e2e/authenticated/` — import `test` from `e2e/fixtures.ts` to get a `page` already logged in as the super admin.
+- `authenticated/pages-render.spec.ts` opens every page in a browser and fails on a PHP fatal error, the 404 page or an uncaught JavaScript error. Add new pages to the lists in `e2e/pages.ts`. Browser tests get CDN files from a local cache (`e2e/cdn.ts`) and can't reach any other outside site.
+- Security sweeps run over every endpoint and page automatically: `authenticated/sql-injection.spec.ts` sends every parameter an endpoint reads (and a field whose name contains a backtick) a value that breaks out of SQL, and `authenticated/xss.spec.ts` gives business A's names and notes script payloads and opens every page. New endpoints and pages are picked up without changes; a failure there is a real injection hole.
+- `authenticated/journeys.spec.ts` drives the everyday jobs through the UI (new project, adding an asset from the assets page, recording a payment, the dispatch board, reporting a fault). If you change one of those pages' forms or scripts, run it.
+- Business rules have their own specs: `asset-availability.spec.ts` (an asset can't be double-booked, within or across businesses), `project-finance.spec.ts` (project totals, and that the `projectsFinanceCache` running totals every price/discount/date/payment endpoint adjusts stay equal to what `projects/data.php` works out) and `project-assets.spec.ts`. `e2e/projects.ts` has helpers to create projects and assets and check a project's finances; if you change an endpoint that affects a project's money, add a step to `project-finance.spec.ts`.
+- Write characterisation tests: assert what the app does today. If you find a bug while writing tests, mark the test `test.fixme` with a comment and raise an issue rather than fixing it in the same PR.
+- For a bug fix, add a test that reproduces the bug first, then fix it.
+- Tests share one database and run serially; create the data each test needs rather than relying on what an earlier test left behind.
+- Multi-tenancy and permissions: `e2e/tenants.ts` gives a `test` with two seeded businesses, A and B (`e2e/setup/tenants.php`), logged-in HTTP sessions for their users, a user who belongs to both (`sharedUser`), and DB snapshots. Add cases to the tables in `authenticated/tenant-isolation.spec.ts` and `authenticated/permissions.spec.ts`.
+- Every page and API endpoint has at least one test. When you add one, add a test for it too, including tenant-isolation and permission cases if it takes record IDs or checks a permission.
 - **OpenAPI docs**: Auto-generated from `@OA\` annotations in PHP files via `zircote/swagger-php`
 - **License**: AGPLv3 - all changes must remain open source
 
 ## Development Environment
 
 - Use the provided `.devcontainer` for GitHub Codespaces or VS Code
+- Default login after seeding: username `username` / password `password!`
 - Development mode: Set environment variable `DEV_MODE=true`
 - Database migrations: Run via `php vendor/bin/phinx migrate` (config in `phinx.php`)
 - Docker: Use provided Dockerfile and docker-compose setup

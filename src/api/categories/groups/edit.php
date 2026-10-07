@@ -8,6 +8,7 @@ foreach ($_POST['formData'] as $item) {
     $array[$item['name']] = $item['value'];
 }
 if (strlen($array['assetCategoriesGroups_id']) < 1) finish(false, ["code" => "PARAM-ERROR", "message" => "No data for action"]);
+unset($array['instances_id']); //Records can't be moved to another business
 
 $DBLIB->where("instances_id", $AUTH->data['instance']['instances_id']);
 $DBLIB->where("assetCategoriesGroups_deleted", 0);
@@ -19,7 +20,7 @@ $bCMS->auditLog("EDIT", "assetCategoriesGroups", json_encode($array), $AUTH->dat
 finish(true);
 
 /** @OA\Post(
- *     path="/categories/edit.php", 
+ *     path="/categories/groups/edit.php", 
  *     summary="Edit Asset Category Group", 
  *     description="Edit an Asset Category Group (Parent)", 
  *     operationId="editCategoryGroup", 

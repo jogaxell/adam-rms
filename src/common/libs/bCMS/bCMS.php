@@ -178,6 +178,38 @@ class bCMS
     $DBLIB->where("s3files_meta_physicallyStored", 1);
     return $DBLIB->getValue("s3files", "SUM(s3files_meta_size)");
   }
+  function s3SubTypeIsInInstance($typeid, $subtype)
+  { //Files are listed by type and subtype (the record they're attached to) whatever business uploaded them, so an uploaded file may only be attached to the current business's records
+    global $DBLIB, $AUTH;
+    if (!is_numeric($typeid) or !in_array((int) $typeid, [2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22])) return false; //Only the file types AdamRMS uses (see the files docs)
+    if ($subtype === null or $subtype === "") return true; //Not attached to anything
+    if (!is_numeric($subtype)) return false;
+    $instanceId = $AUTH->data['instance']['instances_id'];
+    if (in_array($typeid, [5, 10, 15, 16, 17])) return $subtype == $instanceId; //The business's own branding and public site
+    if ($typeid == 9) return $subtype == $AUTH->data['users_userid'] or $AUTH->serverPermissionCheck("USERS:EDIT:THUMBNAIL"); //User thumbnails
+    $records = [ // type => [table, id column, SQL limiting the table to the business]
+      2 => ["assetTypes", "assetTypes_id", "(assetTypes.instances_id IS NULL OR assetTypes.instances_id = ?)"], //Shared types too
+      3 => ["assetTypes", "assetTypes_id", "(assetTypes.instances_id IS NULL OR assetTypes.instances_id = ?)"],
+      4 => ["assets", "assets_id", "assets.instances_id = ?"],
+      7 => ["projects", "projects_id", "projects.instances_id = ?"],
+      8 => ["maintenanceJobs", "maintenanceJobs_id", "maintenanceJobs.instances_id = ?"],
+      11 => ["locations", "locations_id", "locations.instances_id = ?"],
+      12 => ["modules", "modules_id", "modules.instances_id = ?"],
+      13 => ["modulesSteps", "modulesSteps_id", "modulesSteps.modules_id IN (SELECT modules_id FROM modules WHERE instances_id = ?)"],
+      14 => ["payments", "payments_id", "payments.projects_id IN (SELECT projects_id FROM projects WHERE instances_id = ?)"],
+      18 => ["projectsVacantRoles", "projectsVacantRoles_id", "projectsVacantRoles.projects_id IN (SELECT projects_id FROM projects WHERE instances_id = ?)"],
+      19 => ["cmsPages", "cmsPages_id", "cmsPages.instances_id = ?"],
+      20 => ["projects", "projects_id", "projects.instances_id = ?"],
+      21 => ["projects", "projects_id", "projects.instances_id = ?"],
+      22 => ["projects", "projects_id", "projects.instances_id = ?"],
+    ];
+    if (!isset($records[$typeid])) return false; //Unknown types can't be attached to anything
+    [$table, $idColumn, $inBusiness] = $records[$typeid];
+    $DBLIB->where($idColumn, $subtype);
+    //Server admins can edit any business's (and shared) asset types
+    if (!in_array($typeid, [2, 3]) or !$AUTH->serverPermissionCheck("ASSETS:EDIT:ANY_ASSET_TYPE")) $DBLIB->where($inBusiness, [$instanceId]);
+    return (bool) $DBLIB->getOne($table, [$idColumn]);
+  }
   function s3List($typeid, $subTypeid = false, $sort = 's3files_meta_uploaded', $sortOrder = 'ASC', $limit = null)
   {
     global $DBLIB, $CONFIG;
@@ -186,7 +218,10 @@ class bCMS
     $DBLIB->where("(s3files_meta_deleteOn >= '" . date("Y-m-d H:i:s") . "' OR s3files_meta_deleteOn IS NULL)"); //If the file is to be deleted soon or has been deleted don't let them download it
     $DBLIB->where("s3files_meta_physicallyStored", 1); //If we've lost the file or deleted it we can't actually let them download it
     $DBLIB->orderBy($sort, $sortOrder);
-    return $DBLIB->get("s3files", $limit, ["s3files_id", "s3files_extension", "s3files_name", "s3files_meta_size", "s3files_meta_uploaded", "s3files_shareKey"]);
+    $files = $DBLIB->get("s3files", $limit, ["s3files_id", "s3files_extension", "s3files_name", "s3files_meta_size", "s3files_meta_uploaded", "s3files_shareKey"]);
+    //The key a share link carries is a hash of the stored one (see share.php and s3URL)
+    foreach ($files as &$file) $file['s3files_shareKeyHash'] = empty($file['s3files_shareKey']) ? null : hash('sha256', $file['s3files_shareKey'] . "|" . $file['s3files_id']);
+    return $files;
   }
   function s3DataUri($fileid)
   {
@@ -263,8 +298,8 @@ class bCMS
     $requireInstance = !in_array($file['s3files_meta_type'], [2, 5, 9, 10, 15, 16, 17]);
     $secure = !in_array($file['s3files_meta_type'], [2, 5, 10, 15, 16, 17]);
 
-    //File has been shared publicly, and the key matches?
-    if ($shareKey and ($shareKey == hash('sha256', $file['s3files_shareKey'] . "|" . $file['s3files_id']))) $secure = false; 
+    //File has been shared publicly, and the key matches? An unshared file has no share key, so never accept one for it
+    if ($shareKey and !empty($file['s3files_shareKey']) and is_string($shareKey) and hash_equals(hash('sha256', $file['s3files_shareKey'] . "|" . $file['s3files_id']), $shareKey)) $secure = false;
 
     if ($secure and !$GLOBALS['AUTH']->login) return false;
     elseif ($secure and $requireInstance and $file["instances_id"] != $AUTH->data['instance']['instances_id']) return false;
@@ -403,6 +438,15 @@ class bCMS
     }
     return ["userData" => $user, "settings" => $configReturn];
   }
+  function positionIsInInstance($positionid, $instanceid)
+  { //Whether the role (instance position) exists and belongs to the business
+    global $DBLIB;
+    if (!is_numeric($positionid)) return false;
+    $DBLIB->where("instancePositions_id", $positionid);
+    $DBLIB->where("instances_id", $instanceid);
+    $DBLIB->where("instancePositions_deleted", 0);
+    return $DBLIB->getValue("instancePositions", "COUNT(*)") > 0;
+  }
   function usersWatchingGroup($groupid)
   {
     global $DBLIB;
@@ -442,6 +486,19 @@ class bCMS
     if ($userCapacity > 0 and $userUsed >= $userCapacity)
       return false;
     return true;
+  }
+  function userIsInInstance($userid, $instanceid)
+  { //Whether the user is a current (not deleted, removed or archived) member of the business
+    global $DBLIB;
+    $DBLIB->join("instancePositions", "userInstances.instancePositions_id=instancePositions.instancePositions_id", "LEFT");
+    $DBLIB->join("users", "userInstances.users_userid=users.users_userid", "LEFT");
+    $DBLIB->where("users.users_deleted", 0); //Deleting an account leaves its memberships in place
+    $DBLIB->where("userInstances.users_userid", $userid);
+    $DBLIB->where("instancePositions.instances_id", $instanceid);
+    $DBLIB->where("userInstances.userInstances_deleted", 0);
+    $DBLIB->where("instancePositions.instancePositions_deleted", 0);
+    $DBLIB->where("(userInstances.userInstances_archived IS NULL OR userInstances.userInstances_archived >= '" . date('Y-m-d H:i:s') . "')");
+    return $DBLIB->getValue("userInstances", "COUNT(*)") > 0;
   }
   function instanceHasProjectCapacity($instanceid)
   {
