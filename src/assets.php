@@ -167,22 +167,27 @@ if (count($sortArray) == 2) {
 $DBLIB->orderBy("assetTypes.assetTypes_name", "ASC"); // Last item in the sort each time
 
 //Keywords
+// The keyword box's terms, shared by the asset type search below and the group cards.
+// Keep every non-empty term (including the literal "0", which a callback-less
+// array_filter() would wrongly drop), then bound the query by capping the number
+// of terms and the length of each so a pathological input can't build a huge WHERE.
+// Split and cut as UTF-8 so a multibyte character (e.g. "Å") is never broken in two;
+// input that isn't valid UTF-8 makes preg_split() return false and is treated as empty.
+$keywordTerms = [];
+if ($SEARCH['SIMPLE'] and $SEARCH['SIMPLE_KEYWORD'] !== '') {
+    $keywordTerms = array_values(array_filter(
+        preg_split('/\s+/u', $SEARCH['SIMPLE_KEYWORD']) ?: [],
+        function ($t) { return strlen(trim((string)$t)) > 0; }
+    ));
+    $keywordTerms = array_slice($keywordTerms, 0, 10);
+    $keywordTerms = array_map(function ($t) { return mb_substr($t, 0, 100, 'UTF-8'); }, $keywordTerms);
+}
 if ($SEARCH['SIMPLE']) {
     // Broad AssetType keyword match: name, description, manufacturer, category name,
     // category-group name, and physical-asset tag. Each whitespace-separated term must
     // match somewhere.
     if ($SEARCH['SIMPLE_KEYWORD'] !== '') {
-        // Keep every non-empty term (including the literal "0", which a callback-less
-        // array_filter() would wrongly drop), then bound the query by capping the number
-        // of terms and the length of each so a pathological input can't build a huge WHERE.
-        // Split and cut as UTF-8 so a multibyte character (e.g. "Å") is never broken in two;
-        // input that isn't valid UTF-8 makes preg_split() return false and is treated as empty.
-        $terms = array_values(array_filter(
-            preg_split('/\s+/u', $SEARCH['SIMPLE_KEYWORD']) ?: [],
-            function ($t) { return strlen(trim((string)$t)) > 0; }
-        ));
-        $terms = array_slice($terms, 0, 10);
-        $terms = array_map(function ($t) { return mb_substr($t, 0, 100, 'UTF-8'); }, $terms);
+        $terms = $keywordTerms;
         if (count($terms) > 0) {
             $instanceIdInt = intval($SEARCH['INSTANCE_ID']);
             $keywordNow = date("Y-m-d H:i:s");
@@ -349,9 +354,7 @@ if ($SEARCH['SETTINGS']['SHOWGROUPS']
     and $SEARCH['PAGE'] == 1) {
 
     $selectedGroupIds = array_values(array_filter(array_map('intval', $SEARCH['TERMS']['GROUPS'])));
-    $groupTerms = $SEARCH['SIMPLE'] ?
-        ($SEARCH['SIMPLE_KEYWORD'] === '' ? [] : array_values(array_filter(preg_split('/\s+/', $SEARCH['SIMPLE_KEYWORD'])))) :
-        array_values(array_filter($SEARCH['TERMS']['KEYWORDS']));
+    $groupTerms = $keywordTerms;
 
     $DBLIB->where("(assetGroups.users_userid IS NULL OR assetGroups.users_userid = ?)", [$AUTH->data['users_userid']]);
     $DBLIB->where("assetGroups.instances_id", $SEARCH['INSTANCE_ID']);

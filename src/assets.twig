@@ -964,23 +964,26 @@ $(document).ready(function () {
         });
     });
     $(document).on('click', '#assetSearchResults .addToBasketGroupButton', function () {
-        const thisButton = $(this);
-        var groupId = thisButton.data("assetgroupid");
-        ajaxcall("projects/assets/assign.php", {"assetGroups_id":groupId,"projects_id":currentProjectId()}, function (data) {
-            var failedIds = (data.response && data.response.failed ? data.response.failed : []).map(function(f) { return f.assets_id; });
-            $(".addToBasketAssetButton[data-assetgroupid=" + groupId + "]").each(function() {
-                var assetId = $(this).data("assetid");
-                if (failedIds.indexOf(assetId) === -1) {
-                    // Sync every copy of this asset on the page (search cards, type modals and
-                    // other group cards), not just the button inside this group's modal.
-                    $(".addToBasketAssetButton[data-assetid=" + assetId + "]").hide();
-                    $(".removeFromBasketAssetButton[data-assetid=" + assetId + "]").show();
-                }
-            });
-            thisButton.prop('disabled', true);
+        var groupId = $(this).data("assetgroupid");
+        var project = resultsProject();
+        ajaxcall("projects/assets/assign.php", {"assetGroups_id":groupId,"projects_id":project.id}, function (data) {
+            if (stillShowing(project)) {
+                var failedIds = (data.response && data.response.failed ? data.response.failed : []).map(function(f) { return f.assets_id; });
+                $(".addToBasketAssetButton[data-assetgroupid=" + groupId + "]").each(function() {
+                    var assetId = $(this).data("assetid");
+                    if (failedIds.indexOf(assetId) === -1) {
+                        // Sync every copy of this asset on the page (search cards, type modals and
+                        // other group cards), not just the button inside this group's modal.
+                        $(".addToBasketAssetButton[data-assetid=" + assetId + "]").hide();
+                        $(".removeFromBasketAssetButton[data-assetid=" + assetId + "]").show();
+                    }
+                });
+                // By selector, not the clicked button: a refresh may have redrawn it
+                $(".addToBasketGroupButton[data-assetgroupid=" + groupId + "]").prop('disabled', true);
+            }
             Toast.fire({
                 type: 'success',
-                title: 'Added to ' + currentProjectName()
+                title: 'Added to ' + project.name
             });
         });
     });
