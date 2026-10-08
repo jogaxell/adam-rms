@@ -134,8 +134,30 @@ There is no automated test suite. Verification = a written manual test script on
 1. Should the board / PDF / invoice show unbound rows at all, or only "N× Type (k picked)"? *Proposal: grouped line on the PDF/invoice; on the board unbound rows count as "to pick" and are not draggable.*
 2. Should the asset search hide per-tag "add" buttons for quantity types entirely, or keep them for the rare "I want exactly this one" case? *Proposal: keep them, collapsed under the details dialog; a tag added this way is booked bound.*
 
+## FR10: Re-arranging unpicked reservations (v1.5.1, approved 2026-10-08)
+
+**Problem (reproduced on the dev stack).** Booking and picking only ever look for *one* cable that is free for a job's whole date range, and an exchange moves only one other reservation. With cables booked end to end on many jobs, the time is fragmented, so the app says no although the cables would fit:
+- *Refused pick:* 2 cables; A (1.–5.) = X, B (3.–8.) = Y, C (6.–10.) = X. Picking Y for A gives NOREPLACEMENT, although A = Y, B = X, C = Y works.
+- *Refused booking:* 2 cables; A (1.–5.) = X, D (9.–12.) = X, C (6.–10.) = Y. B (3.–8.) gets 0 of 1, although A = X, B = Y, C = X, D = Y works.
+
+What is already safe: no cable ever ends up on two overlapping jobs, and no job loses a booked cable (every move re-checks the whole date range in the locked transaction). FR10 only removes false refusals.
+
+| # | Rule |
+|---|---|
+| R1 | **When.** Only when the direct way fails: a booking that finds fewer free cables than asked, or a pick whose cable is an unpicked reservation of an overlapping job (that case always goes through the planner, because it already had to move something). Simple cases behave exactly as in v1.5.0. |
+| R2 | **What may move.** Unpicked reservations (`assetsAssignments_bound = 0`) of the type, on jobs that are not deleted, haven't ended yet and hold their assets (status not released, or the job asked for), and that are linked to the request through overlapping dates. |
+| R3 | **What never moves.** Picked cables, reservations of jobs that already ended, other types. Blocked or archived (ended before the job ends) cables get no reservation. Existing reservations on them may move off when the planner runs. |
+| R4 | **Method.** The reservations to place are tried in three cheap orders: by start date, keeping each one's cable where possible; by start date, giving each the free cable whose next booking starts soonest after it ends ("tightest fit"); and most constrained first. Without picked cables in the way the first order is exact (needs no more cables than the busiest day). If all three fail, a search always places the reservation with the fewest cables left next and backs out as soon as one has none, limited to 10 000 steps / 1.5 s, because proving that no layout exists can take long. A quick count refuses real shortages up front (more reservations than usable cables at some moment). |
+| R5 | **Preference for a reservation that has to move or is new:** same storage location as the scanned cable (pick) or the type's main storage location (booking), then the cable the picking job just released, then lowest tag. |
+| R6 | **Traceability.** Every moved reservation of another job gets an `EXCHANGE-ASSET` audit entry on that job ("… moved to … to make room for …"). The finance cache of every touched job is corrected (rate overrides). `assign.php` adds `rearranged` (projects_id + projects_name) and the search page toast mentions it. Picking reports moved jobs in `exchangedWith` as before. |
+| R7 | **Fallback.** If no layout is found the request is refused exactly as in v1.5.0 (partial booking or NOREPLACEMENT), and nothing changes. A booking that can't be met in full books the largest number the planner can fit. |
+
+**Known limit (measured):** in near-full schedules the planner can still give up before finding a layout that exists (5 of ~300 test questions, all in a 10-cable/30-job pool); the pick is then refused as before and another cable can be scanned.
+
+**Success criteria:** both examples above succeed with the stated layouts. The v1.5.0 full run (spec tests 1–10) still passes 35/35. A chain where no layout exists is still refused, with nothing changed. No cable is ever on two overlapping jobs after any test.
+
 ## Follow-ups (not in scope, noticed while building)
 - **Date changes with unpicked placeholders**: if a project's new dates clash on a placeholder, the existing check refuses the change (spec test 8). It could instead re-pick a free cable of the type automatically.
 - **Permissions**: picking by scan (Barcode Dispatch, Quick Dispatch) needs only `PROJECTS:PROJECT_ASSETS:EDIT:ASSIGNMENT_STATUS`, while the manual *Pick tag…* needs `PROJECTS:PROJECT_ASSETS:CREATE:ASSIGN_AND_UNASSIGN`. Picking never changes how many are booked, but it can swap another project's placeholder.
-- **Maintenance blocks on placeholders**: a placeholder whose reserved cable gets blocked by maintenance keeps it until someone picks or swaps it. It could move to a free cable automatically.
+- **Maintenance blocks on placeholders**: a placeholder whose reserved cable gets blocked by maintenance keeps it until someone picks or swaps it, or until FR10's planner runs for that type. It could move straight away when the block is created.
 - **Quick Dispatch on a bad status** picks the cable before the status is checked (Barcode Dispatch checks first).

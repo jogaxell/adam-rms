@@ -93,3 +93,24 @@ Plan: `tasks/plan-quantity-booking.md` · Spec: `SPEC-quantity-booking.md`
     10. 20 bulk-created with unique tags + QR barcodes; a refused request creates nothing
   - Test 7's no-op scan on a real dev project writes an `EDIT-STATUS` audit entry each run, and the type edits log under the type id as project id (an existing quirk). Those 7 test entries were deleted afterwards.
 - [ ] **CP-C**: review, then merge on the user's go-ahead.
+
+## v1.5.1 — FR10 Re-arranging unpicked reservations
+- [x] **T14: Planner**
+  - Acceptance: `quantityPlan()` in `quantityBooking.php` follows R2–R5 and returns the moves plus the cables for new reservations, or false. `quantityApplyPlan()` performs the moves with finance correction and audit entries (R6).
+  - Verify: scratchpad `qb_chain.php` against the dev DB: the refused-pick and refused-booking chains get the expected layouts, an impossible chain returns false, and nothing is double-booked.
+  - Files: `src/common/libs/bCMS/quantityBooking.php`
+- [x] **T15: Use it for picking and booking**
+  - Acceptance: an exchange in `quantityBindLocked()` goes through the planner (R1). `assign.php` falls back to it when too few cables are directly free, books the largest number that fits, and reports `rearranged`. The search toast mentions moved jobs.
+  - Verify: both chains over HTTP; the full run `qb_fullrun.sh` still 35/35.
+  - Files: `quantityBooking.php`, `src/api/projects/assets/assign.php`, `src/assets.twig`
+  - Done 2026-10-08, verified on the dev stack (scratchpad `qb_chain.php`, `qb_eval.php`, `qb_fullrun.sh`; own data, cleaned up):
+    - the refused-pick chain now gives A = Y (picked), B = X, C = Y; the refused booking now books 1 with C and D moved (also over HTTP: `assign.php` reports `rearranged`); with no possible layout the pick is still refused and nothing changes;
+    - 25 random 6-cable runs: never double-booked, every job kept its count, every refused booking was a real shortage;
+    - frozen-state evaluation, 5 near-full pools, ~300 exchange questions, compared with an exhaustive reference search: never a wrong yes; 5 wrong refusals in the tightest pool (10 cables / 30 jobs), none in the others; about 6–11 reservations moved per successful pick in those overloaded pools after "send back where possible"; slowest call 1.5 s (the time limit);
+    - 100 cables / 80 jobs: slowest booking 0.03 s, slowest pick 0.10 s;
+    - v1.5.0 full run still 35/35.
+  - Found while building: the shuffle passes reseeded PHP's global random generator, which would have affected other code using `mt_rand()`. Removed.
+- [ ] **T16: Docs + release**
+  - Acceptance: the Readme bullet and OA docs mention the re-arranging; release v1.5.1 after merge.
+  - Files: `Readme.md`, `assign.php` OA block
+

@@ -994,6 +994,7 @@ $(document).ready(function () {
             Toast.fire({
                 type: (done < quantity ? 'warning' : 'success'),
                 title: (adding ? 'Booked ' : 'Removed ') + done + (done < quantity ? ' of ' + quantity : '') + (adding ? ' on ' : ' from ') + project.name
+                + ((data.response.rearranged || []).length ? '<br><small>Unpicked reservations of ' + $('<div>').text(data.response.rearranged.map(function (p) { return p.projects_name; }).join(', ')).html() + ' were re-arranged to make room</small>' : '')
             });
             if (stillShowing(project)) runSearch(new URLSearchParams(window.location.search).get('page') || 1);
         });

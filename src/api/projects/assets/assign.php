@@ -33,7 +33,20 @@ if (isset($_POST['assetTypes_id']) and isset($_POST['quantity'])) {
 
     $DBLIB->startTransaction(); //Rolled back by MysqliDb's shutdown handler if anything below finishes early
     quantityLockType($assetType['assetTypes_id']);
-    $freeAssets = quantityFreeAssets($assetType['assetTypes_id'], $project, $quantity, quantityMainStorageLocation($assetType['assetTypes_id']));
+    $mainStorageLocation = quantityMainStorageLocation($assetType['assetTypes_id']);
+    $freeAssets = quantityFreeAssets($assetType['assetTypes_id'], $project, $quantity, $mainStorageLocation);
+    $rearranged = [];
+    if (count($freeAssets) < $quantity) {
+        //Not enough free for the whole time: re-arrange other jobs' unpicked reservations to make room (FR10), for as many as fit
+        for ($wanted = $quantity; $wanted > count($freeAssets); $wanted--) {
+            $plan = quantityPlan($assetType['assetTypes_id'], $project, $wanted, null, $mainStorageLocation);
+            if (!$plan) continue;
+            $rearranged = quantityApplyPlan($plan, $project);
+            if ($rearranged === false) finish(false, ["message" => "Could not re-arrange the other bookings"]);
+            $freeAssets = $plan['new'];
+            break;
+        }
+    }
     if (count($freeAssets) < 1) finish(false, ["message" => "No " . $assetType['assetTypes_name'] . " is free for the project's dates"]);
     foreach ($freeAssets as $asset) {
         $insert = $DBLIB->insert("assetsAssignments", [
@@ -56,7 +69,7 @@ if (isset($_POST['assetTypes_id']) and isset($_POST['quantity'])) {
     }
     if (!$projectFinanceCacher->save()) finish(false, ["message" => "Finance Cacher Save failed"]);
     $DBLIB->commit();
-    finish(true, null, ["failed" => [], "assigned" => count($freeAssets), "requested" => $quantity]);
+    finish(true, null, ["failed" => [], "assigned" => count($freeAssets), "requested" => $quantity, "rearranged" => $rearranged]);
 }
 
 if (isset($_POST['assetGroups_id'])) {
@@ -226,7 +239,7 @@ Requires Instance Permission PROJECTS:PROJECT_ASSETS:CREATE:ASSIGN_AND_UNASSIGN
  *     @OA\Parameter(
  *         name="quantity",
  *         in="query",
- *         description="optional, with assetTypes_id of a type booked by quantity - books up to this many (1-1000) free assets as unbound placeholders. The response adds assigned (how many were booked) and requested.",
+ *         description="optional, with assetTypes_id of a type booked by quantity - books up to this many (1-1000) free assets as unbound placeholders. If too few are free for the whole time, other projects' unpicked placeholders of the type are re-arranged to make room. The response adds assigned (how many were booked), requested and rearranged (projects_id + projects_name of each other project whose placeholders moved).",
  *         required="false",
  *         @OA\Schema(
  *             type="number"),
