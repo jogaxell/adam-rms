@@ -100,6 +100,7 @@ else {
  *     summary="Edit an Asset Type", 
  *     description="Edits an asset type's data  
 Requires Instance Permission ASSETS:ASSET_TYPES:EDIT
+formData may include assetTypes_quantityBooking (0/1) - book assets of the type by quantity. Changing it doesn't affect existing assignments.
 ", 
  *     operationId="editAssetType", 
  *     tags={"assets"}, 

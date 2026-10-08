@@ -75,8 +75,21 @@ Plan: `tasks/plan-quantity-booking.md` · Spec: `SPEC-quantity-booking.md`
   - Verify: spec test 10; quantity 1 behaves exactly as before; the print link shows N labels.
   - Files: `src/api/assets/newAssetFromType.php`, `src/newAsset.twig`
   - Done 2026-10-08: quantity 3 → A-0077..79, each with its own QR barcode, storage location and notes. Quantity 2 + custom tag and quantity 501 are refused. Quantity 1 + custom tag, and a request without the field, behave as before. The label link (`barcodePrint.php?barcodeType=QR_CODE&ids=…`) printed the 3 labels without creating new barcodes. In Chrome: the field shows once a type is chosen and disables/clears the tag above 1; saving 2 → "2 assets added (A-0081 to A-0082) · Print labels". Not tested: a failure midway (the rollback path is the same MysqliDb transaction already proven in T3).
-- [ ] **T13: Docs + full run**
+- [x] **T13: Docs + full run**
   - Acceptance: a Fork Improvements bullet in `Readme.md`, and `@OA` docs updated for every new param/field.
   - Verify: the full spec test list 1–10 on the dev stack, results noted here.
   - Files: `Readme.md`, touched endpoints' OA blocks
+  - Done 2026-10-08: Readme bullet "Booking by quantity", and bulk create merged into the existing "adding assets" bullet. OA docs now cover assign/unassign `quantity`, the setStatusBarcode/setStatusByTag pick behaviour and fields, `bind.php`, newAssetFromType `assets_quantity` and the asset type setting.
+  - Full run (scratchpad `qb_fullrun.sh`, own fixture, cleaned up): **35/35 checks passed**, spec tests 1–10:
+    1. book 10 of 12 (tray 1 first, subtotal 70.00, search "2 free")
+    2. B gets only the 2 free, nothing overlaps
+    3. free scan picks and follows the rate override (+12.00)
+    4. exchange gives B a cable from the scanned cable's tray rather than the released one, with BIND/EXCHANGE audit entries
+    5. CONFLICT changes nothing
+    6. all picked → NOTASSIGNED + allPicked, then the offered add books it picked
+    7. legacy scan/assign/unassign responses unchanged apart from the added fields
+    8. moving C onto A's dates is refused, listing the clashing cables
+    9. switching the setting off/on leaves every assignment untouched
+    10. 20 bulk-created with unique tags + QR barcodes; a refused request creates nothing
+  - Test 7's no-op scan on a real dev project writes an `EDIT-STATUS` audit entry each run, and the type edits log under the type id as project id (an existing quirk). Those 7 test entries were deleted afterwards.
 - [ ] **CP-C**: review, then merge on the user's go-ahead.

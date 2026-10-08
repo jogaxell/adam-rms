@@ -133,3 +133,9 @@ There is no automated test suite. Verification = a written manual test script on
 ## Open Questions
 1. Should the board / PDF / invoice show unbound rows at all, or only "N× Type (k picked)"? *Proposal: grouped line on the PDF/invoice; on the board unbound rows count as "to pick" and are not draggable.*
 2. Should the asset search hide per-tag "add" buttons for quantity types entirely, or keep them for the rare "I want exactly this one" case? *Proposal: keep them, collapsed under the details dialog; a tag added this way is booked bound.*
+
+## Follow-ups (not in scope, noticed while building)
+- **Date changes with unpicked placeholders**: if a project's new dates clash on a placeholder, the existing check refuses the change (spec test 8). It could instead re-pick a free cable of the type automatically.
+- **Permissions**: picking by scan (Barcode Dispatch, Quick Dispatch) needs only `PROJECTS:PROJECT_ASSETS:EDIT:ASSIGNMENT_STATUS`, while the manual *Pick tag…* needs `PROJECTS:PROJECT_ASSETS:CREATE:ASSIGN_AND_UNASSIGN`. Picking never changes how many are booked, but it can swap another project's placeholder.
+- **Maintenance blocks on placeholders**: a placeholder whose reserved cable gets blocked by maintenance keeps it until someone picks or swaps it. It could move to a free cable automatically.
+- **Quick Dispatch on a bad status** picks the cable before the status is checked (Barcode Dispatch checks first).

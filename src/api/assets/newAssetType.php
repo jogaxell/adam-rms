@@ -53,6 +53,7 @@ else finish(true, null, ["assetTypes_id" => $result]);
  *     path="/assets/newAssetType.php", 
  *     summary="Create Asset Type", 
  *     description="Creates an asset type  
+formData may include assetTypes_quantityBooking (0/1) - book assets of the type by quantity.
 Requires Instance Permission ASSETS:ASSET_TYPES:CREATE
 ", 
  *     operationId="createAssetType", 

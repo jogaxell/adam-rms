@@ -146,5 +146,21 @@ Requires Instance Permission PROJECTS:PROJECT_ASSETS:CREATE:ASSIGN_AND_UNASSIGN
  *         @OA\Schema(
  *             type="number"), 
  *         ), 
+ *     @OA\Parameter(
+ *         name="assetTypes_id",
+ *         in="query",
+ *         description="Asset Type ID, with projects_id - removes every assignment of the type, or with quantity only unpicked quantity booking placeholders",
+ *         required="false", 
+ *         @OA\Schema(
+ *             type="number"), 
+ *         ), 
+ *     @OA\Parameter(
+ *         name="quantity",
+ *         in="query",
+ *         description="optional, with assetTypes_id and projects_id - removes up to this many (1-1000) unpicked placeholders, newest first; picked assets are never removed this way. The response then holds removed and requested.",
+ *         required="false", 
+ *         @OA\Schema(
+ *             type="number"), 
+ *         ), 
  * )
  */

@@ -46,7 +46,7 @@ else {
  *  @OA\Post(
  *      path="/projects/assets/setStatusByTag.php",
  *      summary="Set Asset Status by Tag",
- *      description="Set asset status for a project by the asset's tag",
+ *      description="Set asset status for a project by the asset's tag. An asset of a type booked by quantity is picked for the project first, as in setStatusBarcode.php (errors CONFLICT, NOREPLACEMENT, or NOTASSIGNED when every booked one is picked)",
  *      operationId="setStatusByTag",
  *      tags={"project_assets"},
  *      @OA\Response(
