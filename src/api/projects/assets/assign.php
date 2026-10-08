@@ -20,6 +20,45 @@ $priceMaths = $projectFinanceHelper->durationMaths($project['projects_id']);
 
 $assetRequiredFields = ["assetTypes_name","assets_tag","assets_id","assets_dayRate","assets_weekRate","assetTypes_dayRate","assetTypes_weekRate","assetTypes_mass","assetTypes_value","assets_value","assets_mass","assets_assetGroups"];
 
+if (isset($_POST['assetTypes_id']) and isset($_POST['quantity'])) {
+    //Quantity booking: book N free assets of the type as unbound placeholders - the physical assets are chosen when scanned
+    require_once __DIR__ . '/../../../common/libs/bCMS/quantityBooking.php';
+    $quantity = filter_var($_POST['quantity'], FILTER_VALIDATE_INT, ["options" => ["min_range" => 1, "max_range" => 1000]]);
+    if ($quantity === false) finish(false, ["message" => "Please enter a quantity between 1 and 1000"]);
+    $DBLIB->where("(assetTypes.instances_id IS NULL OR assetTypes.instances_id = ?)", [$AUTH->data['instance']['instances_id']]);
+    $DBLIB->where("assetTypes.assetTypes_id", $_POST['assetTypes_id']);
+    $assetType = $DBLIB->getOne("assetTypes", ["assetTypes_id", "assetTypes_name", "assetTypes_quantityBooking", "assetTypes_dayRate", "assetTypes_weekRate", "assetTypes_mass", "assetTypes_value"]);
+    if (!$assetType) finish(false, ["message" => "Asset type not found"]);
+    if ($assetType['assetTypes_quantityBooking'] != 1) finish(false, ["message" => "This asset type is not booked by quantity"]);
+
+    $DBLIB->startTransaction(); //Rolled back by MysqliDb's shutdown handler if anything below finishes early
+    quantityLockType($assetType['assetTypes_id']);
+    $freeAssets = quantityFreeAssets($assetType['assetTypes_id'], $project, $quantity, quantityMainStorageLocation($assetType['assetTypes_id']));
+    if (count($freeAssets) < 1) finish(false, ["message" => "No " . $assetType['assetTypes_name'] . " is free for the project's dates"]);
+    foreach ($freeAssets as $asset) {
+        $insert = $DBLIB->insert("assetsAssignments", [
+            "projects_id" => $project['projects_id'],
+            "assets_id" => $asset['assets_id'],
+            "assetsAssignments_bound" => 0,
+            "assetsAssignments_deleted" => 0,
+            "assetsAssignments_timestamp" => date('Y-m-d H:i:s'),
+            "assetsAssignments_discount" => $project['projects_defaultDiscount']
+        ]);
+        if (!$insert) finish(false, ["message" => "Cannot insert assignment"]);
+        $projectFinanceCacher->adjust('projectsFinanceCache_mass', ($asset['assets_mass'] !== null ? $asset['assets_mass'] : $assetType['assetTypes_mass']));
+        $projectFinanceCacher->adjust('projectsFinanceCache_value', new Money(($asset['assets_value'] !== null ? $asset['assets_value'] : $assetType['assetTypes_value']), new Currency($AUTH->data['instance']['instances_config_currency'])));
+        $price = new Money(null, new Currency($AUTH->data['instance']['instances_config_currency']));
+        $price = $price->add((new Money(($asset['assets_dayRate'] !== null ? $asset['assets_dayRate'] : $assetType['assetTypes_dayRate']), new Currency($AUTH->data['instance']['instances_config_currency'])))->multiply($priceMaths['days']));
+        $price = $price->add((new Money(($asset['assets_weekRate'] !== null ? $asset['assets_weekRate'] : $assetType['assetTypes_weekRate']), new Currency($AUTH->data['instance']['instances_config_currency'])))->multiply($priceMaths['weeks']));
+        $projectFinanceCacher->adjust('projectsFinanceCache_equipmentSubTotal', $price, false);
+        if ($project['projects_defaultDiscount'] > 0) $projectFinanceCacher->adjust('projectsFinanceCache_equiptmentDiscounts', $price->subtract($price->multiply(1 - ($project['projects_defaultDiscount'] / 100))));
+        $bCMS->auditLog("ASSIGN-ASSET", "assetsAssignments", $insert, $AUTH->data['users_userid'], null, $project['projects_id']);
+    }
+    if (!$projectFinanceCacher->save()) finish(false, ["message" => "Finance Cacher Save failed"]);
+    $DBLIB->commit();
+    finish(true, null, ["failed" => [], "assigned" => count($freeAssets), "requested" => $quantity]);
+}
+
 if (isset($_POST['assetGroups_id'])) {
     $DBLIB->where("(users_userid IS NULL OR users_userid = '" . $AUTH->data['users_userid'] . "')");
     $DBLIB->where("instances_id",$AUTH->data['instance']["instances_id"]);
@@ -172,9 +211,25 @@ Requires Instance Permission PROJECTS:PROJECT_ASSETS:CREATE:ASSIGN_AND_UNASSIGN
  *         name="assets_id",
  *         in="query",
  *         description="Asset ID",
- *         required="false", 
+ *         required="false",
  *         @OA\Schema(
- *             type="number"), 
- *         ), 
+ *             type="number"),
+ *         ),
+ *     @OA\Parameter(
+ *         name="assetTypes_id",
+ *         in="query",
+ *         description="Asset Type ID - assigns every available asset of the type, or with quantity only that many",
+ *         required="false",
+ *         @OA\Schema(
+ *             type="number"),
+ *         ),
+ *     @OA\Parameter(
+ *         name="quantity",
+ *         in="query",
+ *         description="optional, with assetTypes_id of a type booked by quantity - books up to this many (1-1000) free assets as unbound placeholders. The response adds assigned (how many were booked) and requested.",
+ *         required="false",
+ *         @OA\Schema(
+ *             type="number"),
+ *         ),
  * )
  */

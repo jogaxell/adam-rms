@@ -100,7 +100,7 @@ function hydrateAssetRow($tag, $instanceId, $dateStart, $dateEnd, $projectId) {
             // If a project is being searched for specifically then we need to check if the asset is assigned to that project or if it is assigned to another project
             $DBLIB->where("(projectsStatuses.projectsStatuses_assetsReleased = 0 OR projects.projects_id = ?)", [$projectId]);
         } else $DBLIB->where("projectsStatuses.projectsStatuses_assetsReleased", 0);
-        $tag['assignment'] = $DBLIB->get("assetsAssignments", null, ["assetsAssignments.assetsAssignments_id", "assetsAssignments.projects_id", "projects.projects_name"]);
+        $tag['assignment'] = $DBLIB->get("assetsAssignments", null, ["assetsAssignments.assetsAssignments_id", "assetsAssignments.projects_id", "assetsAssignments.assetsAssignments_bound", "projects.projects_name"]);
     }
     $tag['flagsblocks'] = assetFlagsAndBlocks($tag['assets_id']);
     return $tag;
@@ -333,9 +333,18 @@ foreach ($assets as $asset) {
     $asset['fields'] = explode(",", $asset['assetTypes_definableFields']);
     $asset['thumbnail'] = $bCMS->s3List(2, $asset['assetTypes_id'],'s3files_meta_uploaded','ASC',1);
     $asset['tags'] = [];
+    $asset['countOnProject'] = 0; //Quantity booking: how many of the type the selected project has, and how many of those aren't picked yet
+    $asset['countUnboundOnProject'] = 0;
     foreach ($assetTags as $tag) {
         $tag = hydrateAssetRow($tag, $SEARCH['INSTANCE_ID'], $dateStart, $dateEnd, $RETURN['PROJECT']['ID']);
         if ($tag['assignment'] or $tag['flagsblocks']['COUNT']['BLOCK'] > 0) $asset['countBlocked']++;
+        if ($RETURN['PROJECT']['ID'] and $tag['assignment']) {
+            foreach ($tag['assignment'] as $assignment) {
+                if ($assignment['projects_id'] != $RETURN['PROJECT']['ID']) continue;
+                $asset['countOnProject']++;
+                if ($assignment['assetsAssignments_bound'] == 0) $asset['countUnboundOnProject']++;
+            }
+        }
         $asset['tags'][] = $tag;
     }
     $asset['countAvailable'] = $asset['count'] - $asset['countBlocked'];

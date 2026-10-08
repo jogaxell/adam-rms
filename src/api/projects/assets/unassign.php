@@ -17,6 +17,22 @@ if (isset($_POST['assets_id']) and isset($_POST['projects_id']) and !isset($_POS
     else finish(false, ["message" => "Could not find assignment"]);
 }
 
+$quantityRequested = null;
+if (isset($_POST['assetTypes_id']) and isset($_POST['projects_id']) and isset($_POST['quantity']) and !isset($_POST['assetsAssignments'])) {
+    //Quantity booking: remove that many unbound placeholders, newest first. Picked assets are only removed one by one.
+    $quantityRequested = filter_var($_POST['quantity'], FILTER_VALIDATE_INT, ["options" => ["min_range" => 1, "max_range" => 1000]]);
+    if ($quantityRequested === false) finish(false, ["message" => "Please enter a quantity between 1 and 1000"]);
+    $DBLIB->join("assets", "assetsAssignments.assets_id=assets.assets_id");
+    $DBLIB->where("assets.assetTypes_id", $_POST['assetTypes_id']);
+    $DBLIB->where("assetsAssignments.projects_id", $_POST['projects_id']);
+    $DBLIB->where("assetsAssignments.assetsAssignments_deleted", 0);
+    $DBLIB->where("assetsAssignments.assetsAssignments_bound", 0);
+    $DBLIB->orderBy("assetsAssignments.assetsAssignments_id", "DESC");
+    $assignments = $DBLIB->get("assetsAssignments", $quantityRequested, ["assetsAssignments_id"]);
+    if ($assignments) $_POST['assetsAssignments'] = array_column($assignments, "assetsAssignments_id");
+    else finish(false, ["message" => "Every booked asset of this type has already been picked - remove picked assets one by one from the project"]);
+}
+
 if (isset($_POST['assetTypes_id']) and isset($_POST['projects_id']) and !isset($_POST['assetsAssignments'])) {
     //convert for where we only know assetType ID and project
     $DBLIB->join("assets", "assetsAssignments.assets_id=assets.assets_id");
@@ -64,7 +80,7 @@ foreach ($assignmentsRemove["assignments"] as $assignment) {
         if ($assignment['assetsAssignments_discount'] > 0) $projectFinanceCacher->adjust('projectsFinanceCache_equiptmentDiscounts', $price->subtract($price->multiply(1 - ($assignment['assetsAssignments_discount'] / 100))), true);
 
         $usersNotified = []; //If user follows multiple groups which this asset is in they'll be notified multiple times otherwise
-        foreach (explode(",", $assignment['assets_assetGroups']) as $group) {
+        if ($assignment['assetsAssignments_bound'] == 1) foreach (explode(",", $assignment['assets_assetGroups']) as $group) { //An unbound placeholder's asset was never chosen, so nobody is told about it
             if (is_numeric($group)) {
                 foreach ($bCMS->usersWatchingGroup($group) as $user) {
                     if ($user != $AUTH->data['users_userid'] and !in_array($user, $usersNotified)) {
@@ -76,7 +92,7 @@ foreach ($assignmentsRemove["assignments"] as $assignment) {
         }
     }
 }
-if ($projectFinanceCacher->save()) finish(true);
+if ($projectFinanceCacher->save()) finish(true, null, ($quantityRequested !== null ? ["removed" => count($assignmentsIDs), "requested" => $quantityRequested] : []));
 else finish(false, ["message" => "Finance Cacher Save failed"]);
 
 /** @OA\Post(

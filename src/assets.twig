@@ -340,6 +340,9 @@
                                             </li>
                                             <li class="small" title="Number owned"><span class="fa-li"><i class="fas fa-boxes"></i></span> {{asset.count}}</li>
                                         {% endif %}
+                                        {% if asset.assetTypes_quantityBooking %}
+                                            <li class="small" title="Projects book a number of these - the assets are chosen when they are scanned"><span class="fa-li"><i class="fas fa-layer-group"></i></span> Booked by quantity</li>
+                                        {% endif %}
                                         {% if searchResults.SEARCH.INSTANCE_ID != USERDATA.instance.instances_id %}
                                             {% for instance in USERDATA.instances %}
                                                 {% if searchResults.SEARCH.INSTANCE_ID == instance.instances_id %}
@@ -351,6 +354,21 @@
                                     </ul>
                                 </div>
                                 <div class="card-footer">
+                                    {% if asset.assetTypes_quantityBooking and searchResults.PROJECT.ID and "PROJECTS:PROJECT_ASSETS:CREATE:ASSIGN_AND_UNASSIGN"|instancePermissions %}
+                                        {# Book by quantity - single assets can still be added from the details dialog #}
+                                        <div class="quantityBooking mb-2" data-assettypeid="{{ asset.assetTypes_id }}" style="max-width: 250px;">
+                                            <div class="small text-muted mb-1">
+                                                {{ asset.countOnProject }} booked{% if asset.countOnProject > 0 %} ({{ asset.countOnProject - asset.countUnboundOnProject }} picked){% endif %} &middot; {{ asset.countAvailable }} free
+                                            </div>
+                                            <div class="input-group input-group-sm">
+                                                <input type="number" class="form-control quantityBookingInput" min="1" max="1000" value="1" aria-label="Quantity">
+                                                <div class="input-group-append">
+                                                    <button type="button" class="btn btn-success quantityBookingAdd" title="Book this many" {% if asset.countAvailable < 1 %}disabled{% endif %}><i class="fas fa-plus"></i> Book</button>
+                                                    <button type="button" class="btn btn-warning quantityBookingRemove" title="Remove this many that haven't been picked yet" {% if asset.countUnboundOnProject < 1 %}disabled{% endif %}><i class="fas fa-minus"></i></button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endif %}
                                     <div class="text-right">
                                         <div class="btn-group">
                                             {% if searchResults.PROJECT.ID and "PROJECTS:PROJECT_ASSETS:CREATE:ASSIGN_AND_UNASSIGN"|instancePermissions %}
@@ -961,6 +979,23 @@ $(document).ready(function () {
                 type: 'success',
                 title: 'Added to ' + project.name
             });
+        });
+    });
+    // Book or reduce a type booked by quantity, then redraw the results so every count and button is current
+    $(document).on('click', '#assetSearchResults .quantityBookingAdd, #assetSearchResults .quantityBookingRemove', function () {
+        var $box = $(this).closest('.quantityBooking');
+        var adding = $(this).hasClass('quantityBookingAdd');
+        var quantity = parseInt($box.find('.quantityBookingInput').val(), 10);
+        if (!(quantity >= 1)) return;
+        var project = resultsProject();
+        $box.find('button').prop('disabled', true);
+        ajaxcall("projects/assets/" + (adding ? "assign.php" : "unassign.php"), {"assetTypes_id": $box.data("assettypeid"), "projects_id": project.id, "quantity": quantity}, function (data) {
+            var done = (adding ? data.response.assigned : data.response.removed);
+            Toast.fire({
+                type: (done < quantity ? 'warning' : 'success'),
+                title: (adding ? 'Booked ' : 'Removed ') + done + (done < quantity ? ' of ' + quantity : '') + (adding ? ' on ' : ' from ') + project.name
+            });
+            if (stillShowing(project)) runSearch(new URLSearchParams(window.location.search).get('page') || 1);
         });
     });
     $(document).on('click', '#assetSearchResults .addToBasketGroupButton', function () {

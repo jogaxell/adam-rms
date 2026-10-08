@@ -20,19 +20,22 @@ Plan: `tasks/plan-quantity-booking.md` · Spec: `SPEC-quantity-booking.md`
   - Done 2026-10-08: a scratch script (scratchpad `qb_test.php`, own data, cleaned up) passed 21 checks, covering every row of the decision table incl. the storage-location preference, finance deltas with a rate override and NOREPLACEMENT rollback. A second process holding the type lock made a bind wait 4.6 s.
 
 ## Slice 2 — Booking
-- [ ] **T4: `assign.php` quantity**
+- [x] **T4: `assign.php` quantity**
   - Acceptance: `assetTypes_id` + `quantity` on a quantity type books up to N free cables (helper order) as `bound = 0`, inside a transaction. The response adds `assigned` (int). If fewer are free → books what is free and reports it. A per-tag assign on a quantity type → `bound = 1`. Without `quantity` → unchanged.
   - Verify: spec tests 1, 2; a legacy call with `assetTypes_id` only still books all of the type.
   - Files: `src/api/projects/assets/assign.php`
-- [ ] **T5: `unassign.php` quantity**
+  - Done 2026-10-08: over HTTP, A booked 10 (tray 1 first, subtotal 70.00 incl. the 5.00 rate override). Overlapping B asked for 3 and got 2, then 1 more was refused. Quantity 0 and quantity on a normal type are refused. Legacy all-of-type booked 12 bound and removed them again, with the same response shape as before.
+- [x] **T5: `unassign.php` quantity**
   - Acceptance: `assetTypes_id` + `projects_id` + `quantity` removes N assignments, unbound first, never bound ones beyond what's needed (and bound ones only when explicitly asked by assignment id). Without `quantity` → unchanged.
   - Verify: book 10, pick 3, reduce by 8 → 7 unbound removed + 1 refused/reported; the finance totals match.
   - Files: `src/api/projects/assets/unassign.php`
-- [ ] **T6: Search page UI**
+  - Done 2026-10-08: remove 3 → 3 newest unbound. With 5 picked, remove 8 → only the 2 unbound go (`removed: 2`), then remove 1 → "all picked" error. Legacy remove-by-asset still works; finance correct after each step. Group-watch notifications are skipped for unbound rows (`assetAssignmentSelector` now also selects `assetsAssignments_bound`).
+- [x] **T6: Search page UI**
   - Acceptance: quantity types show a number input (max = available) + Add / Remove, and "N booked" when a project is selected. Per-tag buttons are moved into the details dialog. Other types are unchanged.
   - Verify: book/reduce from the search page; available counts update; no console errors.
   - Files: `src/assets.php`, `src/assets.twig`
-- [ ] **CP-A**: spec tests 1, 2, 7.
+  - Done 2026-10-08: in Chrome, Book 2 → toast "Booked 2 on QB Test B" and the results redraw (3→5 booked, 5→3 free); Remove 3 → 2 booked, 6 free, no console errors. Per-tag buttons stay in the details dialog unchanged.
+- [x] **CP-A**: spec tests 1, 2, 7 (all passed 2026-10-08, see T4–T6).
 
 ## Slice 3 — Picking
 - [ ] **T7: Bind on scan**
