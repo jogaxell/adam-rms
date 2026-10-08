@@ -172,6 +172,10 @@ function projectFinancials($project) {
         $return['assetsAssigned'][$key]['totals']['formattedDiscountPrice'] = $moneyFormatter->format($return['assetsAssigned'][$key]['totals']['discountPrice']);
         $return['assetsAssigned'][$key]['totals']['formattedPrice'] = $moneyFormatter->format($return['assetsAssigned'][$key]['totals']['price']);
         $return['assetsAssigned'][$key]['totals']['formattedMass'] = number_format($return['assetsAssigned'][$key]['totals']['mass'], 2, '.', '') . "kg";
+        //Quantity booking: how many of the type are booked, and how many of those have been picked by scanning
+        $return['assetsAssigned'][$key]['totals']['quantityBooking'] = ($type['assets'][0]['assetTypes_quantityBooking'] == 1);
+        $return['assetsAssigned'][$key]['totals']['count'] = count($type['assets']);
+        $return['assetsAssigned'][$key]['totals']['picked'] = count(array_filter($type['assets'], fn($asset) => $asset['assetsAssignments_bound'] == 1));
     }
     foreach ($return['assetsAssignedSUB'] as $instanceid => $instance) {
         if (!isset($return['assetsAssignedSUB'][$instanceid]['instance'])) {
@@ -191,6 +195,9 @@ function projectFinancials($project) {
             $return['assetsAssignedSUB'][$instanceid]['assets'][$key]['totals']['formattedDiscountPrice'] = $moneyFormatter->format($return['assetsAssignedSUB'][$instanceid]['assets'][$key]['totals']['discountPrice']);
             $return['assetsAssignedSUB'][$instanceid]['assets'][$key]['totals']['formattedPrice'] = $moneyFormatter->format($return['assetsAssignedSUB'][$instanceid]['assets'][$key]['totals']['price']);
             $return['assetsAssignedSUB'][$instanceid]['assets'][$key]['totals']['formattedMass'] = number_format($return['assetsAssignedSUB'][$instanceid]['assets'][$key]['totals']['mass'], 2, '.', '') . "kg";
+            $return['assetsAssignedSUB'][$instanceid]['assets'][$key]['totals']['quantityBooking'] = ($type['assets'][0]['assetTypes_quantityBooking'] == 1);
+            $return['assetsAssignedSUB'][$instanceid]['assets'][$key]['totals']['count'] = count($type['assets']);
+            $return['assetsAssignedSUB'][$instanceid]['assets'][$key]['totals']['picked'] = count(array_filter($type['assets'], fn($asset) => $asset['assetsAssignments_bound'] == 1));
         }
     }
 

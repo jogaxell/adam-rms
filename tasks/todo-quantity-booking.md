@@ -51,14 +51,17 @@ Plan: `tasks/plan-quantity-booking.md` · Spec: `SPEC-quantity-booking.md`
   - Also: Location Dispatch leaves placeholders out (they have no physical asset to locate), and the "Add asset?" prompt says when every booked one is already picked.
   - Done 2026-10-08: in Chrome, project C showed "3× to pick" (dashed, not draggable: sortable `items` limited to cards). Scanning QB-07 logged "picked → Pending pick" and showed the reload badge; after closing, the board had the QB-07 card + "2× to pick". No console errors.
 - [x] **CP-B**: spec tests 3–6 + a legacy `setStatusBarcode` call (all passed 2026-10-08, see T7–T8).
-- [ ] **T9: Project data + asset list**
+- [x] **T9: Project data + asset list**
   - Acceptance: `data.php` adds per-type `totals.quantityBooking`, `totals.count`, `totals.picked` (additive). The asset list shows "N× Type (k picked)", bound rows with tags, unbound rows as "not picked yet" without a tag.
   - Verify: the project page with a mixed booking; mobile-shaped `data.php` output only gains fields.
   - Files: `src/api/projects/data.php`, `src/project/project_assets.twig`
-- [ ] **T10: Manual "Pick tag…"**
+  - Done 2026-10-08: `data.php` totals gain `quantityBooking`, `count` and `picked` (main and sub-business). In Chrome the list read "2x QB Test Cable · 1 of 2 picked", the unpicked row "not picked yet" (no tag, storage location or scan shown) and the picked row "QB-11 Körche". After a manual pick it read "2 of 2 picked". No console errors.
+- [x] **T10: Manual "Pick tag…"**
   - Acceptance: on an unbound row, enter or select a tag → new `src/api/projects/assets/bind.php` (permission `ASSIGN_AND_UNASSIGN`) runs the same `quantityBindScan()` logic.
   - Verify: pick a free tag, a tag that is a placeholder elsewhere (exchange), and a tag that is bound elsewhere (error).
   - Files: `src/api/projects/assets/bind.php`, `src/project/project_assets.twig`
+  - The tag field also accepts a barcode value. As with a scan, the first unpicked placeholder of the type moves, not necessarily the clicked row (they're interchangeable). Error messages are HTML-escaped, since the prompt shows them as HTML; Quick Dispatch's pick errors are escaped the same way.
+  - Done 2026-10-08: over HTTP, free tag → picked; B's placeholder → exchanged (A +20.00 and B −24.00 with the rate override). Then ALREADYBOUND, unknown tag (NOTFOUND), wrong type (WRONGTYPE), empty tag, a tag picked for B (CONFLICT) and all picked (ALLPICKED). In Chrome: Pick tag… → QB-09 → reload shows it picked.
 
 ## Slice 4 — Display, bulk create, docs
 - [ ] **T11: PDF / invoice grouping**

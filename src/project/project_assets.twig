@@ -275,6 +275,24 @@
                 });
             }
         });
+        // Quantity booking: pick an asset by typing its tag, for when there's no scanner to hand
+        $(".quantityPickTag").click(function () {
+            var assignmentId = $(this).data("assignmentid");
+            bootbox.prompt({
+                title: "Pick asset",
+                message: "Tag or barcode of the asset you have taken for this project:",
+                callback: function (tag) {
+                    if (!tag || !tag.trim()) return;
+                    ajaxcall("projects/assets/bind.php", {"assetsAssignments_id": assignmentId, "assets_tag": tag.trim()}, function (data) {
+                        var exchanged = (data.response.exchangedWith || []).map(function (project) { return project.projects_name; });
+                        if (exchanged.length) {
+                            Toast.fire({type: 'info', title: 'Picked - exchanged with ' + $('<div>').text(exchanged.join(", ")).html()});
+                            setTimeout(function () { location.reload(); }, 1500);
+                        } else location.reload();
+                    }, false);
+                }
+            });
+        });
         $("#swapAsset").click(function () {
             let selected = getSelected();
             if (selected.length < 1) {

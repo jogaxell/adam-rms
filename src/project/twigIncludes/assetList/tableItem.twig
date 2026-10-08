@@ -2,6 +2,9 @@
 <tr class="categoryFilter categoryFilter{{ categoryid }} showHideFilter" data-filter="typeFilter{{ type['assets'][0].assetTypes_id }}">
     <td><input type="checkbox" class="assetAssignmentCheckboxType" data-instanceid="{{ instanceid }}"  data-typeid="{{ type['assets'][0].assetTypes_id }}" /></td>
     <td colspan="4">{{ type['assets']|length }}x <b>{{ type['assets'][0].manufacturers_id != 1 ? type['assets'][0].manufacturers_name ~ " - " : "" }}{{ type['assets'][0].assetTypes_name }}</b>
+        {% if type['totals']['quantityBooking'] is defined and type['totals']['quantityBooking'] %}
+            <span class="badge {{ type['totals']['picked'] < type['totals']['count'] ? 'badge-warning' : 'badge-success' }}" title="Booked by quantity - assets are picked when they are scanned">{{ type['totals']['picked'] }} of {{ type['totals']['count'] }} picked</span>
+        {% endif %}
     </td>
     <td>
         {{ type['totals']['status'] }}
@@ -28,6 +31,14 @@
         {% if type['assets']|length == 1 %}
             <b>{{ assetAssignment.manufacturers_id != 1 ? assetAssignment.manufacturers_name ~ " - " : "" }}{{ assetAssignment.assetTypes_name }}</b>
         {% endif %}
+        {% set unpicked = (assetAssignment.assetsAssignments_bound is defined and assetAssignment.assetsAssignments_bound == 0) %}
+        {% if unpicked %}
+            {# Quantity booking placeholder: the asset it sits on is only a reservation, so its tag isn't shown #}
+            <span class="text-muted font-italic" title="Booked by quantity - which asset goes out is decided when one is scanned">not picked yet</span>
+            {% if "PROJECTS:PROJECT_ASSETS:CREATE:ASSIGN_AND_UNASSIGN"|instancePermissions %}
+                <button type="button" class="btn btn-xs btn-outline-secondary ml-1 quantityPickTag" data-assignmentid="{{ assetAssignment.assetsAssignments_id }}" title="Enter the tag of the asset you have taken">Pick tag&hellip;</button>
+            {% endif %}
+        {% else %}
         <a target="_blank" href="{{ CONFIG.ROOTURL }}/asset.php?id={{assetAssignment.assetTypes_id}}&asset={{assetAssignment.assets_id}}&instance={{ instanceid }}">{{ assetAssignment.assets_tag|aTag }}</a>
         {% for flag in assetAssignment.flagsblocks.FLAG %}
             <a  target="_blank" href="{{ CONFIG.ROOTURL }}/maintenance/job.php?id={{ flag.maintenanceJobs_id }}" class="btn btn-sm btn-warning"><i class="far fa-flag" title="{{ flag.maintenanceJobs_title }}"></i></a>
@@ -37,6 +48,7 @@
         {% endfor %}
         {% if assetAssignment.assetsAssignments_linkedTo %}
             <button class="btn btn-sm btn-secondary" title="Asset was assigned automatically because it's linked to another asset"><i class="fas fa-link"></i></button>
+        {% endif %}
         {% endif %}
 
     </td>
@@ -54,10 +66,10 @@
     {% endfor %}
     </td>
     {% endif %}
-    <td>{{ assetAssignment.storage_location is defined and assetAssignment.storage_location|length > 0 ? assetAssignment.storage_location[0].locations_name : '' }}</td>
+    <td>{{ not unpicked and assetAssignment.storage_location is defined and assetAssignment.storage_location|length > 0 ? assetAssignment.storage_location[0].locations_name : '' }}</td>
     <td>
-        {{ (assetAssignment.assetsAssignmentsStatus_name ? assetAssignment.assetsAssignmentsStatus_name ~ "/" : '') }}
-        {% if assetAssignment.latestScan %}
+        {{ (assetAssignment.assetsAssignmentsStatus_name ? assetAssignment.assetsAssignmentsStatus_name ~ (unpicked ? '' : "/") : '') }}
+        {% if assetAssignment.latestScan and not unpicked %}
             {% if assetAssignment.latestScan.locations_name %}
                 {{ assetAssignment.latestScan.locations_name }}
             {% elseif assetAssignment.latestScan.assetTypes_name %}

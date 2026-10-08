@@ -11,7 +11,7 @@ $DBLIB->where("assets.instances_id", $AUTH->data['instance']['instances_id']);
 $taggedAsset = $DBLIB->getOne("assets", ["assets.assets_id"]);
 if ($taggedAsset) {
     $quantityBind = quantityBindForProject($_POST['projects_id'], $taggedAsset['assets_id']);
-    if (in_array($quantityBind['code'], ["CONFLICT", "NOREPLACEMENT", "ERROR"])) finish(false, ["message" => $quantityBind['message'], "code" => ($quantityBind['code'] == "ERROR" ? "PICKFAILED" : $quantityBind['code'])]);
+    if (in_array($quantityBind['code'], ["CONFLICT", "NOREPLACEMENT", "ERROR"])) finish(false, ["message" => $bCMS->sanitizeString($quantityBind['message']), "code" => ($quantityBind['code'] == "ERROR" ? "PICKFAILED" : $quantityBind['code'])]); //Quick Dispatch shows it as HTML
     if ($quantityBind['code'] == "ALLPICKED") finish(false, ["message" => $quantityBind['message'], "code" => "NOTASSIGNED"]);
 }
 
