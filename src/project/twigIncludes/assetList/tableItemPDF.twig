@@ -22,10 +22,12 @@
 {% endif %}
 {% for assetAssignment in type['assets'] %}
     {% if type['assets']|length == 1 or GET['showAll'] %}
+    {# A quantity booking placeholder only reserves an asset, so its tag, flags and fields aren't printed #}
+    {% set unpicked = (assetAssignment.assetsAssignments_bound is defined and assetAssignment.assetsAssignments_bound == 0) %}
     [
         {% if GET['checkboxes'] %}'[  ]',{% endif %}
         { 
-            text: "{% if type['assets']|length == 1 %}{{ assetAssignment.manufacturers_id != 1 ? assetAssignment.manufacturers_name|escape("js") ~ " - " : "" }}{{ assetAssignment.assetTypes_name|escape("js") }}{% else %}{% endif %}{% if GET['showAll'] %}{{ assetAssignment.assets_tag|aTag|escape("js") }}{% endif %} {% if GET['flagsBlocks'] %}{% for flag in assetAssignment.flagsblocks.FLAG %}[F]{% endfor %}{% for flag in assetAssignment.flagsblocks.BLOCK %}[B]{% endfor %}{% endif %}{% if assetAssignment.assetsAssignments_linkedTo %}[L]{% endif %}",
+            text: "{% if type['assets']|length == 1 %}{{ assetAssignment.manufacturers_id != 1 ? assetAssignment.manufacturers_name|escape("js") ~ " - " : "" }}{{ assetAssignment.assetTypes_name|escape("js") }}{% else %}{% endif %}{% if GET['showAll'] %}{{ unpicked ? (type['assets']|length == 1 ? ' - ' : '') ~ 'not picked yet' : assetAssignment.assets_tag|aTag|escape("js") }}{% endif %} {% if GET['flagsBlocks'] and not unpicked %}{% for flag in assetAssignment.flagsblocks.FLAG %}[F]{% endfor %}{% for flag in assetAssignment.flagsblocks.BLOCK %}[B]{% endfor %}{% endif %}{% if assetAssignment.assetsAssignments_linkedTo %}[L]{% endif %}",
             colSpan: {{ (assetAssignment.assetsAssignments_comment and GET['comments'] ? 1 : assetAssignment.assetTypes_definableFields_ARRAY|length > 0 ? (GET['comments'] ? 2 : 1) : (GET['comments'] ? 3 : 2)) }}
         },
         {{ (assetAssignment.assetsAssignments_comment and GET['comments'] ? '' : assetAssignment.assetTypes_definableFields_ARRAY|length > 0 ? (GET['comments'] ? '{},' : '') : (GET['comments'] ? '{},{},' : '{},')) }}
@@ -40,7 +42,7 @@
         {
           stack: [
             {% for field in assetAssignment.assetTypes_definableFields|split(",") %}
-                {% if field != "" %}
+                {% if field != "" and not unpicked %}
                     '{{ field|escape("js") }}: {{ assetAssignment['asset_definableFields_' ~ loop.index]|escape("js") }}',
                 {% endif %}
             {% endfor %}

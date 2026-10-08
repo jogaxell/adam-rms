@@ -64,14 +64,17 @@ Plan: `tasks/plan-quantity-booking.md` · Spec: `SPEC-quantity-booking.md`
   - Done 2026-10-08: over HTTP, free tag → picked; B's placeholder → exchanged (A +20.00 and B −24.00 with the rate override). Then ALREADYBOUND, unknown tag (NOTFOUND), wrong type (WRONGTYPE), empty tag, a tag picked for B (CONFLICT) and all picked (ALLPICKED). In Chrome: Pick tag… → QB-09 → reload shows it picked.
 
 ## Slice 4 — Display, bulk create, docs
-- [ ] **T11: PDF / invoice grouping**
+- [x] **T11: PDF / invoice grouping**
   - Acceptance: quantity types appear as one line "N× Type" with the total price. Bound tags are listed as today if the template lists tags; unbound rows show no tag.
   - Verify: generate the project PDF + invoice for a mixed booking.
   - Files: `src/project/pdf.twig` (+ invoice twig if separate)
-- [ ] **T12: Bulk create**
+  - The PDF already prints one "N× Type" line with the type total. Tags only appear with "show all", so the change is there: unpicked rows print "not picked yet" without tag, [F]/[B] flags or definable fields. (The same template serves invoice, quote and delivery note; `export-note.twig` lists no assets.)
+  - Done 2026-10-08: invoice with show all → "3x QB Test Cable", "not picked yet" ×2, "QB-10". Without show all → only the type line.
+- [x] **T12: Bulk create**
   - Acceptance: a Quantity field (1–500) on the new-asset form. `newAssetFromType.php` with `quantity` creates N assets + N QR barcodes in one transaction, with auto tags. A custom tag is only allowed with quantity 1. The response adds `assets[]`. The success message links to `maintenance/barcodePrint.php?ids=…`.
   - Verify: spec test 10; quantity 1 behaves exactly as before; the print link shows N labels.
   - Files: `src/api/assets/newAssetFromType.php`, `src/newAsset.twig`
+  - Done 2026-10-08: quantity 3 → A-0077..79, each with its own QR barcode, storage location and notes. Quantity 2 + custom tag and quantity 501 are refused. Quantity 1 + custom tag, and a request without the field, behave as before. The label link (`barcodePrint.php?barcodeType=QR_CODE&ids=…`) printed the 3 labels without creating new barcodes. In Chrome: the field shows once a type is chosen and disables/clears the tag above 1; saving 2 → "2 assets added (A-0081 to A-0082) · Print labels". Not tested: a failure midway (the rollback path is the same MysqliDb transaction already proven in T3).
 - [ ] **T13: Docs + full run**
   - Acceptance: a Fork Improvements bullet in `Readme.md`, and `@OA` docs updated for every new param/field.
   - Verify: the full spec test list 1–10 on the dev stack, results noted here.

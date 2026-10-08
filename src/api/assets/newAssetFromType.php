@@ -16,6 +16,14 @@ $DBLIB->where("assetTypes_id", $array['assetTypes_id']);
 $asset = $DBLIB->getone("assetTypes");
 if (!$asset) finish(false, ["code" => "LIST-ASSETTYPES-FAIL", "message" => "Could not find asset type"]);
 
+//Bulk creation: up to 500 assets of the type at once, each with its own generated tag and barcode
+$quantity = 1;
+if (isset($array['assets_quantity']) and $array['assets_quantity'] !== '') {
+    $quantity = filter_var($array['assets_quantity'], FILTER_VALIDATE_INT, ["options" => ["min_range" => 1, "max_range" => 500]]);
+    if ($quantity === false) finish(false, ["code" => "PARAM-ERROR", "message" => "Please enter a quantity between 1 and 500"]);
+}
+if ($quantity > 1 and isset($array['assets_tag']) and $array['assets_tag'] != null) finish(false, ["code" => "PARAM-ERROR", "message" => "A custom tag can only be used when adding a single asset"]);
+
 if (isset($array['assets_tag']) and $array['assets_tag'] != null) {
     $DBLIB->where("assets.instances_id", $AUTH->data['instance']['instances_id']);
     $DBLIB->where("assets.assets_tag", $array['assets_tag']);
@@ -33,10 +41,6 @@ if (isset($array['assets_storageLocation']) and $array['assets_storageLocation']
     if (!$DBLIB->getValue("locations", "count(*)")) finish(false, ["code" => "PARAM-ERROR", "message" => "Could not find that storage location"]);
 } else unset($array['assets_storageLocation']);
 
-$result = $DBLIB->insert("assets", array_intersect_key($array, array_flip(['assets_tag', 'assetTypes_id', 'assets_notes', 'assets_storageLocation', 'instances_id', 'asset_definableFields_1', 'asset_definableFields_2', 'asset_definableFields_3', 'asset_definableFields_4', 'asset_definableFields_5', 'asset_definableFields_6', 'asset_definableFields_7', 'asset_definableFields_8', 'asset_definableFields_9', 'asset_definableFields_10', 'assets_assetGroups'])));
-
-if (!$result) finish(false, ["code" => "INSERT-FAIL", "message" => "Could not insert asset"]);
-
 function checkDuplicate($value, $type)
 {
     global $DBLIB;
@@ -47,28 +51,39 @@ function checkDuplicate($value, $type)
     else return false;
 }
 
-//Generate asset barcode
+$DBLIB->startTransaction(); //All or nothing - rolled back by MysqliDb's shutdown handler if anything below finishes early
+$created = [];
+for ($i = 0; $i < $quantity; $i++) {
+    if ($i > 0) $array['assets_tag'] = generateNewTag(); //Sees the tags inserted so far, as they're in the same transaction
+    $result = $DBLIB->insert("assets", array_intersect_key($array, array_flip(['assets_tag', 'assetTypes_id', 'assets_notes', 'assets_storageLocation', 'instances_id', 'asset_definableFields_1', 'asset_definableFields_2', 'asset_definableFields_3', 'asset_definableFields_4', 'asset_definableFields_5', 'asset_definableFields_6', 'asset_definableFields_7', 'asset_definableFields_8', 'asset_definableFields_9', 'asset_definableFields_10', 'assets_assetGroups'])));
+    if (!$result) finish(false, ["code" => "INSERT-FAIL", "message" => "Could not insert asset"]);
 
-$assetBarcodeData = [
-    "assetsBarcodes_value" => $array['assets_tag'],
-    "assetsBarcodes_type" => "QR_CODE",
-    "assets_id" => $result,
-    "users_userid" => $AUTH->data['users_userid'],
-    "assetsBarcodes_added" => date("Y-m-d H:i:s")
-];
-while (checkDuplicate($assetBarcodeData["assetsBarcodes_value"], $assetBarcodeData["assetsBarcodes_type"])) {
-    $assetBarcodeData["assetsBarcodes_value"] = mt_rand(1000, 999999); //Duplicate, so generate a hopefully random number as a replacement
+    //Generate asset barcode
+    $assetBarcodeData = [
+        "assetsBarcodes_value" => $array['assets_tag'],
+        "assetsBarcodes_type" => "QR_CODE",
+        "assets_id" => $result,
+        "users_userid" => $AUTH->data['users_userid'],
+        "assetsBarcodes_added" => date("Y-m-d H:i:s")
+    ];
+    while (checkDuplicate($assetBarcodeData["assetsBarcodes_value"], $assetBarcodeData["assetsBarcodes_type"])) {
+        $assetBarcodeData["assetsBarcodes_value"] = mt_rand(1000, 999999); //Duplicate, so generate a hopefully random number as a replacement
+    }
+    $insert = $DBLIB->insert("assetsBarcodes", $assetBarcodeData);
+    //We don't really mind if the insert fails, we can always generate another one later...
+
+    $created[] = ["assets_id" => $result, "assets_tag" => $array['assets_tag']];
 }
-$insert = $DBLIB->insert("assetsBarcodes", $assetBarcodeData);
-//We don't really mind if the insert fails, we can always generate another one later...
+$DBLIB->commit();
 
-finish(true, null, ["assets_id" => $result, "assets_tag" => $array['assets_tag'], "assetTypes_id" => $array['assetTypes_id']]);
+finish(true, null, ["assets_id" => $created[0]['assets_id'], "assets_tag" => $created[0]['assets_tag'], "assetTypes_id" => $array['assetTypes_id'], "assets" => $created]);
 
 /** @OA\Post(
  *     path="/assets/newAssetFromType.php", 
  *     summary="Create Asset From Type", 
  *     description="Creates an asset from an asset type
 Requires Instance Permission 17 ASSETS:CREATE
+Optional assets_quantity (1-500) in formData creates that many assets with generated tags (a custom assets_tag only with 1), all or nothing. The response adds assets: [{assets_id, assets_tag}] for every asset created.
 ", 
  *     operationId="createAssetFromType", 
  *     tags={"assets"}, 
