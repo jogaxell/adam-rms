@@ -168,6 +168,28 @@ function quantityBindScan($project, $assetsId)
 }
 
 /**
+ * For the endpoints that set a status from a scanned or typed asset: picks the asset for the project first if its
+ * type is booked by quantity, so the status change that follows finds an assignment for it.
+ * @param int $projectsId Not yet validated - only projects of the current instance are used
+ * @param int $assetsId The asset, already checked to belong to the user's instance
+ * @return array quantityBindScan's result, or ["code" => "NOTQUANTITY"] when there is nothing to pick
+ */
+function quantityBindForProject($projectsId, $assetsId)
+{
+    global $DBLIB, $AUTH;
+    $DBLIB->where("assets.assets_id", $assetsId);
+    $DBLIB->join("assetTypes", "assets.assetTypes_id=assetTypes.assetTypes_id", "LEFT");
+    if ($DBLIB->getValue("assets", "assetTypes.assetTypes_quantityBooking") != 1) return ["code" => "NOTQUANTITY"];
+
+    $DBLIB->where("projects.projects_id", $projectsId);
+    $DBLIB->where("projects.instances_id", $AUTH->data['instance']['instances_id']);
+    $DBLIB->where("projects.projects_deleted", 0);
+    $project = $DBLIB->getOne("projects", ["projects_id", "projects_name", "projects_dates_deliver_start", "projects_dates_deliver_end"]);
+    if (!$project or $project['projects_dates_deliver_start'] === null or $project['projects_dates_deliver_end'] === null) return ["code" => "NOTQUANTITY"];
+    return quantityBindScan($project, $assetsId);
+}
+
+/**
  * The body of quantityBindScan, run while the asset type is locked. The caller commits or rolls back.
  */
 function quantityBindLocked($project, $asset)

@@ -1,7 +1,19 @@
 <?php
 require_once __DIR__ . '/../../apiHeadSecure.php';
+require_once __DIR__ . '/../../../common/libs/bCMS/quantityBooking.php';
 
 if (!$AUTH->instancePermissionCheck("PROJECTS:PROJECT_ASSETS:EDIT:ASSIGNMENT_STATUS") or !isset($_POST['projects_id']) or !isset($_POST['assetsAssignments_status']) or !isset($_POST['text']) or strlen($_POST['text']) < 1) finish(false, ["message" => "Missing required fields","code"=>"MISSINGFIELDS"]);
+
+// Quantity booking: an asset of a type booked by quantity is picked for this project first, as in setStatusBarcode.php
+$DBLIB->where("assets.assets_deleted", 0);
+$DBLIB->where("assets.assets_tag", $_POST["text"]);
+$DBLIB->where("assets.instances_id", $AUTH->data['instance']['instances_id']);
+$taggedAsset = $DBLIB->getOne("assets", ["assets.assets_id"]);
+if ($taggedAsset) {
+    $quantityBind = quantityBindForProject($_POST['projects_id'], $taggedAsset['assets_id']);
+    if (in_array($quantityBind['code'], ["CONFLICT", "NOREPLACEMENT", "ERROR"])) finish(false, ["message" => $quantityBind['message'], "code" => ($quantityBind['code'] == "ERROR" ? "PICKFAILED" : $quantityBind['code'])]);
+    if ($quantityBind['code'] == "ALLPICKED") finish(false, ["message" => $quantityBind['message'], "code" => "NOTASSIGNED"]);
+}
 
 $DBLIB->where("assets.assets_deleted",0);
 $DBLIB->where("assets.assets_tag", $_POST["text"]);

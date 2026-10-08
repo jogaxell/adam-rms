@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../apiHeadSecure.php';
+require_once __DIR__ . '/../../../common/libs/bCMS/quantityBooking.php';
 
 if (!$AUTH->instancePermissionCheck("PROJECTS:PROJECT_ASSETS:EDIT:ASSIGNMENT_STATUS") or !isset($_POST['projects_id']) or !isset($_POST['assetsAssignments_status']) or !isset($_POST['text']) or strlen($_POST['text']) < 1) finish(false);
 
@@ -43,7 +44,22 @@ if (!$recordLocationOnly) {
 
 $DBLIB->where("assets.assets_id", $barcode['assets_id']);
 $DBLIB->join("assetTypes", "assets.assetTypes_id=assetTypes.assetTypes_id", "LEFT");
-$asset = $DBLIB->getone("assets", ["assets.assets_id", "assets.assets_tag", "assets.assets_storageLocation", "assetTypes.assetTypes_name"]);
+$asset = $DBLIB->getone("assets", ["assets.assets_id", "assets.assets_tag", "assets.assets_storageLocation", "assetTypes.assetTypes_name", "assetTypes.assetTypes_quantityBooking"]);
+
+// Validate that the requested status belongs to the current instance and is not deleted
+$DBLIB->where("assetsAssignmentsStatus_id", $_POST['assetsAssignments_status']);
+$DBLIB->where("instances_id", $AUTH->data['instance']['instances_id']);
+$DBLIB->where("assetsAssignmentsStatus_deleted", 0);
+$status = $DBLIB->getone("assetsAssignmentsStatus", ["assetsAssignmentsStatus_id", "assetsAssignmentsStatus_name"]);
+
+// Quantity booking: an asset of a type booked by quantity is picked for this project before its status is set,
+// taking the place of one of the project's unpicked placeholders (and exchanging it with another project's if needed)
+$quantityBind = ["code" => "NOTQUANTITY"];
+if ($asset['assetTypes_quantityBooking'] == 1) {
+    if (!$status) finish(false, ["message" => "Status not found", "code" => "STATUSNOTFOUND"]); //Don't pick an asset for a status that can't be set
+    $quantityBind = quantityBindForProject($_POST['projects_id'], $barcode['assets_id']);
+    if (in_array($quantityBind['code'], ["CONFLICT", "NOREPLACEMENT", "ERROR"])) finish(false, ["message" => $quantityBind['message'], "code" => ($quantityBind['code'] == "ERROR" ? "PICKFAILED" : $quantityBind['code']), "assets_id" => $barcode['assets_id'], "assets_tag" => $asset['assets_tag'], "assetTypes_name" => $asset['assetTypes_name']]);
+}
 
 $DBLIB->where("assetsAssignments.assets_id", $barcode['assets_id']);
 $DBLIB->where("assetsAssignments.projects_id", $_POST['projects_id']);
@@ -54,7 +70,7 @@ $DBLIB->join("projects", "assetsAssignments.projects_id=projects.projects_id", "
 $currentAssignment = $DBLIB->getOne("assetsAssignments", ["assetsAssignments.assetsAssignments_id", "assetsAssignmentsStatus_id", "projects.projects_name", "projects.locations_id"]);
 
 if (!$currentAssignment) {
-    finish(false, ["message" => "Asset not assigned to project", "code" => "NOTASSIGNED", "assets_id" => $barcode['assets_id'], "assets_tag" => $asset['assets_tag'], "assetTypes_name" => $asset['assetTypes_name']]);
+    finish(false, ["message" => ($quantityBind['code'] == "ALLPICKED" ? $quantityBind['message'] : "Asset not assigned to project"), "code" => "NOTASSIGNED", "assets_id" => $barcode['assets_id'], "assets_tag" => $asset['assets_tag'], "assetTypes_name" => $asset['assetTypes_name'], "allPicked" => ($quantityBind['code'] == "ALLPICKED")]);
 }
 
 // Work out where the asset is going before touching its status, so a bad location doesn't leave a half-done scan
@@ -91,15 +107,9 @@ if ($recordLocationOnly and $locationType != "") {
     } else finish(false, ["message" => "Unknown location type", "code" => "INVALIDLOCATION"]);
 }
 
-// Validate that the requested status belongs to the current instance and is not deleted
-$DBLIB->where("assetsAssignmentsStatus_id", $_POST['assetsAssignments_status']);
-$DBLIB->where("instances_id", $AUTH->data['instance']['instances_id']);
-$DBLIB->where("assetsAssignmentsStatus_deleted", 0);
-$status = $DBLIB->getone("assetsAssignmentsStatus", ["assetsAssignmentsStatus_id", "assetsAssignmentsStatus_name"]);
-
 // Called once the status is in place: record the location (if any) and report back
 function dispatchFinished() {
-    global $DBLIB, $AUTH, $bCMS, $barcode, $asset, $status, $scanLocation, $locationSkipped, $currentAssignment;
+    global $DBLIB, $AUTH, $bCMS, $barcode, $asset, $status, $scanLocation, $locationSkipped, $currentAssignment, $quantityBind;
     $bCMS->auditLog("EDIT-STATUS", "assetsAssignments", "set to " . $_POST['assetsAssignments_status'] . " by barcode scan", $AUTH->data['users_userid'], null, $_POST['projects_id']);
     if ($scanLocation) {
         $DBLIB->insert("assetsBarcodesScans", [
@@ -119,6 +129,8 @@ function dispatchFinished() {
         "assetsAssignmentsStatus_name" => ($status ? $status['assetsAssignmentsStatus_name'] : null),
         "location_name" => ($scanLocation ? $scanLocation['locations_name'] : null),
         "locationSkipped" => $locationSkipped,
+        "bound" => ($quantityBind['code'] == "BOUND"), //This scan picked the asset for a quantity booking
+        "exchangedWith" => ($quantityBind['exchangedWith'] ?? []), //Projects whose placeholder it was - they got another asset of the type
     ]);
 }
 
@@ -163,6 +175,7 @@ dispatchFinished();
  *     description="Set the status for an asset assignment using a barcode
 Requires Instance Permission PROJECTS:PROJECT_ASSETS:EDIT:ASSIGNMENT_STATUS
 If the barcode belongs to a location rather than an asset, fails with code ISLOCATION and returns the location.
+For an asset type booked by quantity, the scanned asset is picked for the project first. Fails with CONFLICT (picked for another project, blocked or archived) or NOREPLACEMENT (an unpicked placeholder elsewhere with no free substitute). NOTASSIGNED has allPicked=true when every booked asset of the type is already picked.
 ",
  *     operationId="setAssetAssignmentStatusBarcode",
  *     tags={"project_assets"},
@@ -181,7 +194,7 @@ If the barcode belongs to a location rather than an asset, fails with code ISLOC
  *                 @OA\Property(
  *                     property="response",
  *                     type="object",
- *                     description="assets_id, assets_tag, assetTypes_name, assetsAssignmentsStatus_name, location_name (the location recorded, or null) and locationSkipped (NOSTORAGELOCATION when locationType=storage and the asset has no storage location, otherwise null)",
+ *                     description="assets_id, assets_tag, assetTypes_name, assetsAssignmentsStatus_name, location_name (the location recorded, or null), locationSkipped (NOSTORAGELOCATION when locationType=storage and the asset has no storage location, otherwise null), bound (true when this scan picked the asset for a quantity booking) and exchangedWith (projects_id + projects_name of each project whose unpicked placeholder it was - they got another asset)",
  *                 ),
  *             ),
  *         ),

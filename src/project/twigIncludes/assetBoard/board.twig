@@ -7,7 +7,13 @@
                     <h3 class="card-title">{{ status['assetsAssignmentsStatus_name'] }}{% if status['assetsAssignmentsStatus_deleted'] %} <span class="badge badge-secondary" title="This status has been deleted">Deleted</span>{% endif %}</h3>
                 </div>
                 <div class="card-body assetDispatchAssetList" data-statusid="{{ status['assetsAssignmentsStatus_id'] }}" data-instance="{{ instanceid }}" data-deleted="{{ status['assetsAssignmentsStatus_deleted'] ? 'true' : 'false' }}">
+                    {% set toPick = {} %}
                     {% for asset in status['assets'] %}
+                        {% if asset['assetsAssignments_bound'] is defined and asset['assetsAssignments_bound'] == 0 %}
+                            {# Quantity booking placeholder: no asset has been picked yet, so it's counted per type instead of shown as a card #}
+                            {% set toPickKey = 't' ~ asset['assetTypes_id'] %}
+                            {% set toPick = toPick|merge({(toPickKey): {'name': asset['assetTypes_name'], 'count': (toPick[toPickKey] is defined ? toPick[toPickKey]['count'] : 0) + 1}}) %}
+                        {% else %}
                         <div class="row align-middle p-2 border border-secondary border-2 rounded mt-auto mb-2 assetDispatchAssetList-card" data-currentstatus="{{ status['assetsAssignmentsStatus_id'] }}" data-assignment="{{ asset['assetsAssignments_id'] }}" data-instance="{{ instanceid }}" data-asset="{{ asset['assets_id'] }}">
                             {% if "PROJECTS:PROJECT_ASSETS:EDIT:ASSIGNMENT_STATUS"|instancePermissions%}
                                 <button class="btn btn-outline-secondary assetDispatchAssetList-statusPrevButton col-1" data-nextstatus="" style="display: none;">«</button>
@@ -16,6 +22,12 @@
                             {% if "PROJECTS:PROJECT_ASSETS:EDIT:ASSIGNMENT_STATUS"|instancePermissions%}
                                 <button class="btn btn-outline-secondary assetDispatchAssetList-statusNextButton col-1" data-nextstatus="" style="display: none;">»</button>
                             {% endif %}
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                    {% for type in toPick %}
+                        <div class="p-2 rounded mb-2 assetDispatchToPick" style="border: 2px dashed rgba(128, 128, 128, .6);" title="Booked by quantity - scan these in Barcode Dispatch to pick them">
+                            <h6 class="my-auto"><span class="badge badge-warning">{{ type.count }}&times; to pick</span><br>{{ type.name }}</h6>
                         </div>
                     {% endfor %}
                 </div>

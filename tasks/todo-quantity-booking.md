@@ -38,15 +38,19 @@ Plan: `tasks/plan-quantity-booking.md` · Spec: `SPEC-quantity-booking.md`
 - [x] **CP-A**: spec tests 1, 2, 7 (all passed 2026-10-08, see T4–T6).
 
 ## Slice 3 — Picking
-- [ ] **T7: Bind on scan**
+- [x] **T7: Bind on scan**
   - Acceptance: `setStatusBarcode.php` calls `quantityBindScan()` before its `NOTASSIGNED` check, for quantity types only. Every row of the decision table works: exchange is silent and audit-logged on both projects (`BIND-ASSET`, `EXCHANGE-ASSET`), and the replacement prefers the scanned cable's storage location. The response adds `bound` / `exchangedWith`. Status and location then proceed as today.
   - Verify: spec tests 3–6; a legacy request on a non-quantity type gives an identical response.
   - Files: `src/api/projects/assets/setStatusBarcode.php`, `quantityBooking.php`
-- [ ] **T8: Barcode Dispatch UI**
+  - Also `setStatusByTag.php` (Quick Dispatch by typed tag), through the shared `quantityBindForProject()`. A quantity scan validates the status before picking.
+  - Done 2026-10-08: over HTTP, free QB-09 → `bound:true`. B's placeholder QB-04 → exchanged, and B got QB-02 (same tray, and the cable A released). Rescan → `bound:false`. A cable picked for B → CONFLICT, nothing changed. Own placeholder → bound in place. All picked → NOTASSIGNED with `allPicked:true`. Unknown status → STATUSNOTFOUND, nothing picked. Quick Dispatch QB-11 → picked for B. A legacy scan of a normal asset only gains `bound:false, exchangedWith:[]`.
+- [x] **T8: Barcode Dispatch UI**
   - Acceptance: the log line shows "picked" / "(exchanged with Project B)". The board shows unbound rows as a "to pick: N" counter per type, not as draggable cards. After a bind, the board is marked stale like for new assets.
   - Verify: scan through a booking of 5 on the 320×450 viewport.
   - Files: `src/project/project_assetsBoard.twig`
-- [ ] **CP-B**: spec tests 3–6 + a legacy `setStatusBarcode` call.
+  - Also: Location Dispatch leaves placeholders out (they have no physical asset to locate), and the "Add asset?" prompt says when every booked one is already picked.
+  - Done 2026-10-08: in Chrome, project C showed "3× to pick" (dashed, not draggable: sortable `items` limited to cards). Scanning QB-07 logged "picked → Pending pick" and showed the reload badge; after closing, the board had the QB-07 card + "2× to pick". No console errors.
+- [x] **CP-B**: spec tests 3–6 + a legacy `setStatusBarcode` call (all passed 2026-10-08, see T7–T8).
 - [ ] **T9: Project data + asset list**
   - Acceptance: `data.php` adds per-type `totals.quantityBooking`, `totals.count`, `totals.picked` (additive). The asset list shows "N× Type (k picked)", bound rows with tags, unbound rows as "not picked yet" without a tag.
   - Verify: the project page with a mixed booking; mobile-shaped `data.php` output only gains fields.

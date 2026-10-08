@@ -208,7 +208,7 @@
         <div class="modal-content">
             <div class="modal-header py-2">
                 <h5 class="modal-title" id="barcodeDispatchModalTitle"><i class="fas fa-barcode mr-1"></i> Barcode Dispatch</h5>
-                <span class="badge badge-warning align-self-center ml-2" id="barcodeDispatchStale" style="display: none;" title="Assets were added to the project - the board reloads when you close this window">Board reloads on close</span>
+                <span class="badge badge-warning align-self-center ml-2" id="barcodeDispatchStale" style="display: none;" title="Assets were added to or picked for the project - the board reloads when you close this window">Board reloads on close</span>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
@@ -335,7 +335,7 @@
                                 </thead>
                                 <tbody>
                                     {% for status in BOARDASSETS[USERDATA.instance.instances_id] %}
-                                        {% for asset in status.assets %}
+                                        {% for asset in status.assets|filter(a => a.assetsAssignments_bound is not defined or a.assetsAssignments_bound != 0) %}
                                             <tr class="location-dispatch-asset-row" data-statusid="{{ status.assetsAssignmentsStatus_id }}" data-instance="{{ USERDATA.instance.instances_id }}">
                                                 <td><input type="checkbox" class="location-dispatch-asset-checkbox" data-assignment="{{ asset.assetsAssignments_id }}" data-tag="{{ asset.assets_tag }}"></td>
                                                 <td><a href="{{ CONFIG.ROOTURL }}/asset.php?id={{ asset.assetTypes_id }}&asset={{ asset.assets_id }}&instance={{ USERDATA.instance.instances_id }}" target="_blank">{{ asset.assets_tag }}</a></td>
@@ -386,7 +386,7 @@
                                 </thead>
                                 <tbody>
                                     {% for status in BOARDASSETS[instance.instance.instances_id] %}
-                                        {% for asset in status.assets %}
+                                        {% for asset in status.assets|filter(a => a.assetsAssignments_bound is not defined or a.assetsAssignments_bound != 0) %}
                                             <tr class="location-dispatch-asset-row" data-statusid="{{ status.assetsAssignmentsStatus_id }}" data-instance="{{ instance.instance.instances_id }}">
                                                 <td><input type="checkbox" class="location-dispatch-asset-checkbox" data-assignment="{{ asset.assetsAssignments_id }}" data-tag="{{ asset.assets_tag }}"></td>
                                                 <td><a href="{{ CONFIG.ROOTURL }}/asset.php?id={{ asset.assetTypes_id }}&asset={{ asset.assets_id }}&instance={{ instance.instance.instances_id }}" target="_blank">{{ asset.assets_tag }}</a></td>
@@ -640,6 +640,13 @@
                 $(".location-dispatch-asset-checkbox[data-assignment='" + assetCard.data("assignment") + "']").closest("tr").children("td").eq(4).text(response.location_name);
             }
         }
+        if (response.bound) {
+            // Picked for a quantity booking - the board shows it as a "to pick" counter, so redraw it on close
+            barcodeDispatchBoardStale = true;
+            $("#barcodeDispatchStale").show();
+            var exchanged = (response.exchangedWith || []).map(function (project) { return project.projects_name; });
+            prefix = (prefix ? prefix + ", " : "") + "picked" + (exchanged.length ? " (exchanged with " + exchanged.join(", ") + ")" : "");
+        }
         var detail = (prefix ? prefix + " " : "") + "→ " + response.assetsAssignmentsStatus_name;
         if (response.location_name) {
             detail += " · " + response.location_name;
@@ -676,7 +683,7 @@
         var assetName = aTag(error.assets_tag) + " " + error.assetTypes_name;
         bootbox.confirm({
             title: "Add asset to project?",
-            message: $("<div>").append($("<strong>").text(assetName), " is not on this project. Add it and set its status?").html(),
+            message: $("<div>").append($("<strong>").text(assetName), (error.allPicked ? " - every booked one has already been picked. Add this one as an extra and set its status?" : " is not on this project. Add it and set its status?")).html(),
             buttons: {
                 confirm: {label: "Add to project", className: "btn-success"},
                 cancel: {label: "Skip", className: "btn-default"}
@@ -749,6 +756,7 @@
             // an asset can only ever be assigned a status belonging to its own instance.
             const instance = this.dataset.instance;
             $(this).sortable({
+                items: "> .assetDispatchAssetList-card", //Not the quantity booking "to pick" counters
                 connectWith: ".assetDispatchAssetList[data-instance='" + instance + "']:not([data-deleted='true'])",
                 update: function( event, ui ){
                     /*
