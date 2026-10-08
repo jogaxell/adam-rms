@@ -11,8 +11,6 @@
 
 require_once __DIR__ . '/../../apiHeadSecure.php';
 require_once __DIR__ . '/../../../common/libs/bCMS/projectFinance.php';
-use Money\Currency;
-use Money\Money;
 
 if (!$AUTH->instancePermissionCheck("PROJECTS:PROJECT_ASSETS:CREATE:ASSIGN_AND_UNASSIGN")) die("404");
 if (!(isset($_POST['assetsAssignments_id'])) || !(isset($_POST['assets_id']))) finish(false);
@@ -55,24 +53,11 @@ if (count($assignments) < 1 and $flagsBlocks['COUNT']['BLOCK'] < 1) {
     $assignment = $DBLIB->update("assetsAssignments", ["assets_id" => $assetToSwap['assets_id']],1);
     if (!$assignment) finish(false);
 
-    // Both assets are the same type, but either can have its own rates, value and mass, so take the old asset's off the project's finances and add the new one's
+    // Both assets are the same type, but either can have its own rates, value and mass
     $DBLIB->where("assetTypes_id", $currentAsset['assetTypes_id']);
     $assetType = $DBLIB->getone("assetTypes", ["assetTypes_dayRate", "assetTypes_weekRate", "assetTypes_value", "assetTypes_mass"]);
     $projectFinanceHelper = new projectFinance();
-    $priceMaths = $projectFinanceHelper->durationMaths($currentAsset['projects_id']);
-    $projectFinanceCacher = new projectFinanceCacher($currentAsset['projects_id']);
-    foreach ([[$currentAsset, true], [$assetToSwap, false]] as [$asset, $subtract]) {
-        $projectFinanceCacher->adjust('projectsFinanceCache_mass', ($asset['assets_mass'] !== null ? $asset['assets_mass'] : $assetType['assetTypes_mass']), $subtract);
-        $projectFinanceCacher->adjust('projectsFinanceCache_value', new Money(($asset['assets_value'] !== null ? $asset['assets_value'] : $assetType['assetTypes_value']), new Currency($AUTH->data['instance']['instances_config_currency'])), $subtract);
-        if ($currentAsset['assetsAssignments_customPrice'] == null) { // A custom price stays the same whichever asset it's for
-            $price = new Money(null, new Currency($AUTH->data['instance']['instances_config_currency']));
-            $price = $price->add((new Money(($asset['assets_dayRate'] !== null ? $asset['assets_dayRate'] : $assetType['assetTypes_dayRate']), new Currency($AUTH->data['instance']['instances_config_currency'])))->multiply($priceMaths['days']));
-            $price = $price->add((new Money(($asset['assets_weekRate'] !== null ? $asset['assets_weekRate'] : $assetType['assetTypes_weekRate']), new Currency($AUTH->data['instance']['instances_config_currency'])))->multiply($priceMaths['weeks']));
-            $projectFinanceCacher->adjust('projectsFinanceCache_equipmentSubTotal', $price, $subtract);
-            if ($currentAsset['assetsAssignments_discount'] > 0) $projectFinanceCacher->adjust('projectsFinanceCache_equiptmentDiscounts', $price->subtract($price->multiply(1 - ($currentAsset['assetsAssignments_discount'] / 100))), $subtract);
-        }
-    }
-    if (!$projectFinanceCacher->save()) finish(false, ["message" => "Finance Cacher Save failed"]);
+    if (!$projectFinanceHelper->swapAssignmentAsset($currentAsset['projects_id'], $currentAsset, $currentAsset, $assetToSwap, $assetType)) finish(false, ["message" => "Finance Cacher Save failed"]);
     finish(true);
 } else finish(false);
 

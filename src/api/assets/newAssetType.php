@@ -43,8 +43,9 @@ $moneyParser = new DecimalMoneyParser($currencies);
 $array['assetTypes_value'] = $moneyParser->parse(($array['assetTypes_value'] ?? '0.00'), $AUTH->data['instance']['instances_config_currency'])->getAmount();
 $array['assetTypes_dayRate'] = $moneyParser->parse(($array['assetTypes_dayRate'] ?? '0.00'), $AUTH->data['instance']['instances_config_currency'])->getAmount();
 $array['assetTypes_weekRate'] = $moneyParser->parse(($array['assetTypes_weekRate'] ?? '0.00'), $AUTH->data['instance']['instances_config_currency'])->getAmount();
+$array['assetTypes_quantityBooking'] = (($array['assetTypes_quantityBooking'] ?? 0) == 1 ? 1 : 0);
 
-$result = $DBLIB->insert("assetTypes", array_intersect_key( $array, array_flip( ['assetTypes_name','assetTypes_productLink','assetCategories_id','manufacturers_id','assetTypes_description','assetTypes_definableFields','assetTypes_mass','assetTypes_inserted',"instances_id","assetTypes_dayRate","assetTypes_weekRate","assetTypes_value"] ) ));
+$result = $DBLIB->insert("assetTypes", array_intersect_key( $array, array_flip( ['assetTypes_name','assetTypes_productLink','assetCategories_id','manufacturers_id','assetTypes_description','assetTypes_definableFields','assetTypes_mass','assetTypes_inserted',"instances_id","assetTypes_dayRate","assetTypes_weekRate","assetTypes_value","assetTypes_quantityBooking"] ) ));
 if (!$result) finish(false, ["code" => "INSERT-FAIL", "message"=> "Could not insert asset type"]);
 else finish(true, null, ["assetTypes_id" => $result]);
 

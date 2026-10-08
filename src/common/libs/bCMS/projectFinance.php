@@ -27,6 +27,35 @@ class projectFinance
       return $this->durationMathsByDates($project['projects_dates_deliver_start'], $project['projects_dates_deliver_end']);
     }
   }
+  /**
+   * Updates a project's finance cache when an assignment moves from one asset to another of the same type.
+   * Either asset can have its own rates, value and mass, so the old asset's are taken off and the new one's added.
+   * @param int $projects_id The project the assignment belongs to
+   * @param array $assignment assetsAssignments_customPrice and assetsAssignments_discount of the assignment
+   * @param array $oldAsset assets_dayRate, assets_weekRate, assets_value and assets_mass of the asset it moves from
+   * @param array $newAsset The same fields for the asset it moves to
+   * @param array $assetType assetTypes_dayRate, assetTypes_weekRate, assetTypes_value and assetTypes_mass of their type
+   * @return bool Whether the finance cache saved
+   */
+  public function swapAssignmentAsset($projects_id, $assignment, $oldAsset, $newAsset, $assetType)
+  {
+    global $AUTH;
+    $currency = new Currency($AUTH->data['instance']['instances_config_currency']);
+    $priceMaths = $this->durationMaths($projects_id);
+    $projectFinanceCacher = new projectFinanceCacher($projects_id);
+    foreach ([[$oldAsset, true], [$newAsset, false]] as [$asset, $subtract]) {
+      $projectFinanceCacher->adjust('projectsFinanceCache_mass', ($asset['assets_mass'] !== null ? $asset['assets_mass'] : $assetType['assetTypes_mass']), $subtract);
+      $projectFinanceCacher->adjust('projectsFinanceCache_value', new Money(($asset['assets_value'] !== null ? $asset['assets_value'] : $assetType['assetTypes_value']), $currency), $subtract);
+      if ($assignment['assetsAssignments_customPrice'] == null) { // A custom price stays the same whichever asset it's for
+        $price = new Money(null, $currency);
+        $price = $price->add((new Money(($asset['assets_dayRate'] !== null ? $asset['assets_dayRate'] : $assetType['assetTypes_dayRate']), $currency))->multiply($priceMaths['days']));
+        $price = $price->add((new Money(($asset['assets_weekRate'] !== null ? $asset['assets_weekRate'] : $assetType['assetTypes_weekRate']), $currency))->multiply($priceMaths['weeks']));
+        $projectFinanceCacher->adjust('projectsFinanceCache_equipmentSubTotal', $price, $subtract);
+        if ($assignment['assetsAssignments_discount'] > 0) $projectFinanceCacher->adjust('projectsFinanceCache_equiptmentDiscounts', $price->subtract($price->multiply(1 - ($assignment['assetsAssignments_discount'] / 100))), $subtract);
+      }
+    }
+    return $projectFinanceCacher->save();
+  }
 }
 class projectFinanceCacher
 {

@@ -18,6 +18,7 @@ $moneyParser = new DecimalMoneyParser($currencies);
 $array['assetTypes_value'] = $moneyParser->parse(($array['assetTypes_value'] ?? "0.00"), $AUTH->data['instance']['instances_config_currency'])->getAmount();
 $array['assetTypes_dayRate'] = $moneyParser->parse(($array['assetTypes_dayRate'] ?? '0.00'), $AUTH->data['instance']['instances_config_currency'])->getAmount();
 $array['assetTypes_weekRate'] = $moneyParser->parse(($array['assetTypes_weekRate'] ?? '0.00'), $AUTH->data['instance']['instances_config_currency'])->getAmount();
+if (array_key_exists('assetTypes_quantityBooking', $array)) $array['assetTypes_quantityBooking'] = ($array['assetTypes_quantityBooking'] == 1 ? 1 : 0); //Only affects new bookings - existing assignments stay bound
 
 if (!$AUTH->serverPermissionCheck("ASSETS:EDIT:ANY_ASSET_TYPE")) {
     $DBLIB->where("(instances_id IS NOT NULL)");
@@ -40,7 +41,7 @@ if (isset($array['assetCategories_id'])) { //Shared categories, or the type's bu
 }
 
 $DBLIB->where("assetTypes_id",$array['assetTypes_id']);
-$result = $DBLIB->update("assetTypes", array_intersect_key( $array, array_flip( ['assetTypes_name','assetCategories_id','assetTypes_productLink','manufacturers_id','assetTypes_description','assetTypes_definableFields','assetTypes_mass','assetTypes_inserted',"assetTypes_dayRate","assetTypes_weekRate","assetTypes_value"] ) ));
+$result = $DBLIB->update("assetTypes", array_intersect_key( $array, array_flip( ['assetTypes_name','assetCategories_id','assetTypes_productLink','manufacturers_id','assetTypes_description','assetTypes_definableFields','assetTypes_mass','assetTypes_inserted',"assetTypes_dayRate","assetTypes_weekRate","assetTypes_value","assetTypes_quantityBooking"] ) ));
 if (!$result) finish(false, ["code" => "UPDATE-FAIL", "message"=> "Could not update asset type"]);
 else {
     $bCMS->auditLog("EDIT-ASSET-TYPE", "assetTypes", json_encode($array), $AUTH->data['users_userid'],null, $array['assetTypes_id']);
