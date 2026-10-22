@@ -27,6 +27,8 @@ foreach ($ids as $id) {
     if ($id == null) continue;
     $DBLIB->join("assetTypes", "assets.assetTypes_id=assetTypes.assetTypes_id", "LEFT");
     $DBLIB->join("manufacturers", "manufacturers.manufacturers_id=assetTypes.manufacturers_id", "LEFT");
+    $DBLIB->join("assetCategories", "assetCategories.assetCategories_id=assetTypes.assetCategories_id", "LEFT");
+    $DBLIB->join("locations", "locations.locations_id=assets.assets_storageLocation AND locations.locations_deleted=0", "LEFT");
     $DBLIB->where("assets.assets_deleted", 0);
     $DBLIB->where("assets.instances_id", $AUTH->data['instance']['instances_id']);
     $DBLIB->where("assets.assets_id", $id);

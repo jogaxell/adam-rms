@@ -9,6 +9,15 @@
                     Asset Type
                 </th>
                 <th>
+                    Category
+                </th>
+                <th>
+                    Manufacturer
+                </th>
+                <th>
+                    Storage Location
+                </th>
+                <th>
                     Barcode
                 </th>
                 <th>
@@ -23,6 +32,15 @@
                 </td>
                 <td>
                      {{ assets[i].isAsset ? assets[i].assetTypes_name : '<i>Not yet associated with asset</i>' }}
+                </td>
+                <td>
+                    {{ assets[i].isAsset ? assets[i].assetCategories_name : '' }}
+                </td>
+                <td>
+                    {{ assets[i].isAsset ? assets[i].manufacturers_name : '' }}
+                </td>
+                <td>
+                    {{ assets[i].isAsset ? assets[i].locations_name : '' }}
                 </td>
                 <td>
                     {{ assets[i].barcode.assetsBarcodes_value }}
