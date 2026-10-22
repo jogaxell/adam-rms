@@ -23,12 +23,29 @@ foreach ($groups as $group) {
         if ($asset) $ids[] = $asset['assets_id'];
     }
 }
+// All of the instance's locations, so each asset's storage location can be shown as its full path (Warehouse › Shelf 3)
+$DBLIB->where("locations.instances_id", $AUTH->data['instance']['instances_id']);
+$DBLIB->where("locations.locations_deleted", 0);
+$locationsById = [];
+foreach ($DBLIB->get("locations", null, ["locations_id", "locations_name", "locations_subOf"]) as $location) {
+    $locationsById[$location['locations_id']] = $location;
+}
+function locationPath($locationId, $locationsById)
+{
+    $names = [];
+    $seen = [];
+    while ($locationId and isset($locationsById[$locationId]) and !isset($seen[$locationId])) {
+        $seen[$locationId] = true;
+        array_unshift($names, $locationsById[$locationId]['locations_name']);
+        $locationId = $locationsById[$locationId]['locations_subOf'];
+    }
+    return implode(" › ", $names);
+}
 foreach ($ids as $id) {
     if ($id == null) continue;
     $DBLIB->join("assetTypes", "assets.assetTypes_id=assetTypes.assetTypes_id", "LEFT");
     $DBLIB->join("manufacturers", "manufacturers.manufacturers_id=assetTypes.manufacturers_id", "LEFT");
     $DBLIB->join("assetCategories", "assetCategories.assetCategories_id=assetTypes.assetCategories_id", "LEFT");
-    $DBLIB->join("locations", "locations.locations_id=assets.assets_storageLocation AND locations.locations_deleted=0", "LEFT");
     $DBLIB->where("assets.assets_deleted", 0);
     $DBLIB->where("assets.instances_id", $AUTH->data['instance']['instances_id']);
     $DBLIB->where("assets.assets_id", $id);
@@ -59,6 +76,7 @@ foreach ($ids as $id) {
         }
 
         $asset['assetTypes_definableFields'] = explode(",", $asset['assetTypes_definableFields']);
+        $asset['locations_path'] = locationPath($asset['assets_storageLocation'], $locationsById);
         $asset['isAsset'] = true;
         $PAGEDATA['assets'][] = $asset;
     }
